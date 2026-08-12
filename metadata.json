@@ -1,0 +1,6 @@
+{
+  "name": "Auto Studio Pro",
+  "description": "工業自動化與電路模擬平台（基本電學、數位邏輯、工業配線、PLC梯形圖）",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
