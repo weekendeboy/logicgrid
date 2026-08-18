@@ -107,10 +107,28 @@ export const WiringEngine = {
         if (t && t.type === 'wire') {
           if (t.subtype === 'l' || t.subtype === 'h') lNets.add(netMap[y][x][(2 + t.rotation) % 4]);
           if (t.subtype === 'n' || t.subtype === 'g') nNets.add(netMap[y][x][(2 + t.rotation) % 4]);
+          if (t.subtype === 'plus') plus24VNets.add(netMap[y][x][(2 + t.rotation) % 4]);
+          if (t.subtype === 'minus' || t.subtype === 'ground') zeroVNets.add(netMap[y][x][(2 + t.rotation) % 4]);
         }
         if (t && t.type === 'power' && t.subtype === 'dc24') {
           plus24VNets.add(netMap[y][x][(0 + t.rotation) % 4]); // top
           zeroVNets.add(netMap[y][x][(2 + t.rotation) % 4]); // bottom
+        }
+        if (t && t.type === 'power' && t.subtype === 'psu_left') {
+          const rightTile = x + 1 < grid[0].length ? grid[y][x + 1] : null;
+          if (rightTile && rightTile.type === 'power' && rightTile.subtype === 'psu_right' && rightTile.groupId === t.groupId) {
+            const lNet = netMap[y][x][(0 + t.rotation) % 4];
+            const nNet = netMap[y][x + 1][(0 + rightTile.rotation) % 4];
+            const isPowered = lNet > 0 && nNet > 0 && lNet !== nNet && lNets.has(lNet) && nNets.has(nNet);
+            t.isPowered = isPowered;
+            rightTile.isPowered = isPowered;
+            if (isPowered) {
+              const p24Net = netMap[y][x][(2 + t.rotation) % 4];
+              const z0Net = netMap[y][x + 1][(2 + rightTile.rotation) % 4];
+              if (p24Net > 0) plus24VNets.add(p24Net);
+              if (z0Net > 0) zeroVNets.add(z0Net);
+            }
+          }
         }
         if (t && t.type === 'pneumatic' && t.subtype === 'air_source') {
           airNets.add(netMap[y][x][(2 + t.rotation) % 4]);
@@ -213,34 +231,37 @@ export const WiringEngine = {
             !shortedNets.has(p2) &&
             !isAirElecMixed;
 
-          if (t.subtype === 'coil' || t.subtype === 'valve_coil') {
-            if (isPowered && t.labels[4]) {
-              activeContacts.add(t.labels[4]);
-              if (t.subtype === 'valve_coil') activeValves.add(t.labels[4]);
-            }
-          } else if (t.subtype === 'ton') {
+          if (t.subtype === 'coil' || t.subtype === 'valve_coil' || t.subtype === 'flash_coil' || t.subtype === 'impulse_coil') {
             if (isPowered) {
-              if (t.isPoweredAt === null) t.isPoweredAt = Date.now();
-              if (Date.now() - t.isPoweredAt >= t.value) t.timerOutput = true;
-            } else {
-              t.isPoweredAt = null;
-              t.timerOutput = false;
-            }
-            if (t.timerOutput && t.labels[4]) activeContacts.add(t.labels[4]);
-          } else if (t.subtype === 'tof') {
-            if (isPowered) {
-              t.isPoweredAt = null;
-              t.timerOutput = true;
-            } else {
-              if (t.timerOutput) {
+              if (t.subtype === 'flash_coil') {
                 if (t.isPoweredAt === null) t.isPoweredAt = Date.now();
-                if (Date.now() - t.isPoweredAt >= t.value) {
-                  t.timerOutput = false;
-                  t.isPoweredAt = null;
+                const flashInterval = t.value || 1000;
+                if (Math.floor((Date.now() - t.isPoweredAt) / flashInterval) % 2 === 0) {
+                  if (t.labels[4]) activeContacts.add(t.labels[4]);
+                  t.isActive = true;
+                } else {
+                  t.isActive = false;
                 }
+              } else if (t.subtype === 'impulse_coil') {
+                if (!t.prevSignal) {
+                  t.outState = !t.outState;
+                }
+                if (t.outState && t.labels[4]) activeContacts.add(t.labels[4]);
+                t.isActive = t.outState;
+              } else {
+                if (t.labels[4]) activeContacts.add(t.labels[4]);
+                if (t.subtype === 'valve_coil' && t.labels[4]) activeValves.add(t.labels[4]);
+                t.isActive = true;
+              }
+            } else {
+              t.isPoweredAt = null;
+              t.isActive = false;
+              if (t.subtype === 'impulse_coil') {
+                if (t.outState && t.labels[4]) activeContacts.add(t.labels[4]);
+                t.isActive = t.outState;
               }
             }
-            if (t.timerOutput && t.labels[4]) activeContacts.add(t.labels[4]);
+            t.prevSignal = isPowered;
           }
         }
 
@@ -433,11 +454,40 @@ export const WiringEngine = {
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[0].length; x++) {
         const t = grid[y][x];
-        if (t && t.type === 'relay' && (t.subtype === 'no' || t.subtype === 'nc')) {
+        const isRelayContact = t && t.type === 'relay' && (
+          t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
+          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+        );
+        if (isRelayContact) {
           if (t.labels && t.labels[4]) {
             const raw = t.labels[4];
             const norm = raw.trim().toUpperCase();
-            t.isActive = activeContacts.has(raw) || activeContacts.has(norm);
+            const isPowered = activeContacts.has(raw) || activeContacts.has(norm);
+            
+            if (t.subtype.startsWith('ton_')) {
+              if (isPowered) {
+                if (t.isPoweredAt === null) t.isPoweredAt = Date.now();
+                if (Date.now() - t.isPoweredAt >= t.value) t.isActive = true;
+              } else {
+                t.isPoweredAt = null;
+                t.isActive = false;
+              }
+            } else if (t.subtype.startsWith('tof_')) {
+              if (isPowered) {
+                t.isPoweredAt = null;
+                t.isActive = true;
+              } else {
+                if (t.isActive) {
+                  if (t.isPoweredAt === null) t.isPoweredAt = Date.now();
+                  if (Date.now() - t.isPoweredAt >= t.value) {
+                    t.isActive = false;
+                    t.isPoweredAt = null;
+                  }
+                }
+              }
+            } else {
+              t.isActive = isPowered;
+            }
           }
         }
         if (

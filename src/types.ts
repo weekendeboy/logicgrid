@@ -8,6 +8,7 @@ export type AppMode = 'tutorial' | 'electronic' | 'logic' | 'wiring' | 'plc';
 export type ToolType = 
   | 'interact'
   | 'select'
+  | 'move'
   | 'label'
   | 'multimeter'
   | 'autowire'

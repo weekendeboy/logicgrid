@@ -53,7 +53,8 @@ export default function App() {
 
   const [autowireWaypoints, setAutowireWaypoints] = useState<Waypoint[]>([]);
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
-  const [hasSelection, setHasSelection] = useState<boolean>(false);
+  const [selectionBounds, setSelectionBounds] = useState<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
+  const hasSelection = !!selectionBounds;
 
   // Undo History
   const historyStackRef = useRef<{ grid: (Tile | null)[][]; faults: Faults }[]>([]);
@@ -434,7 +435,7 @@ export default function App() {
 
       setGrid(newGrid);
       setAutowireWaypoints([]);
-      setHasSelection(false);
+      setSelectionBounds(null);
       setFaults({ opens: [], shorts: [] });
     },
     [gridSize, logicLevel, currentMode]
@@ -541,7 +542,7 @@ export default function App() {
   // Set Tool
   const handleSetTool = (tool: ToolType) => {
     setCurrentTool(tool);
-    if (tool !== 'select') setHasSelection(false);
+    if (tool !== 'select') setSelectionBounds(null);
     if (tool !== 'autowire') setAutowireWaypoints([]);
   };
 
@@ -566,15 +567,18 @@ export default function App() {
   };
 
   // Rotate Tool Preset
+  const handleRotatePlacement = () => {
+    setPlacementRotation((r) => (r + 1) % 4);
+  };
+  
+  // Handle sidebar tool click context menu
   const handleRotateTool = (e: React.MouseEvent, typeStr: string) => {
     e.preventDefault();
-    const svg = e.currentTarget.querySelector('.wire-svg');
-    if (svg) {
-      const currentRot = parseInt(svg.getAttribute('data-rot') || '0');
-      const newRot = (currentRot + 1) % 4;
-      svg.setAttribute('data-rot', newRot.toString());
-      (svg as HTMLElement).style.transform = `rotate(${newRot * 90}deg)`;
-      handleSetPlacement(typeStr, e.currentTarget as HTMLElement);
+    if (currentTool === 'place' && `${placementType}_${placementSubtype}` === typeStr) {
+      handleRotatePlacement();
+    } else {
+      handleSetPlacement(typeStr);
+      setPlacementRotation(1); // Set to 1 because 0 is default and we are explicitly right-clicking to rotate
     }
   };
 
@@ -645,27 +649,14 @@ export default function App() {
   };
 
   const handleCopySelection = (changeTool: boolean = true) => {
-    let minX = gridSize,
-      maxX = -1,
-      minY = gridSize,
-      maxY = -1;
-    for (let y = 0; y < gridSize; y++) {
-      for (let x = 0; x < gridSize; x++) {
-        if (grid[y][x]) {
-          minX = Math.min(minX, x);
-          maxX = Math.max(maxX, x);
-          minY = Math.min(minY, y);
-          maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    if (minX > maxX) return;
+    if (!selectionBounds) return;
+    const { minX, maxX, minY, maxY } = selectionBounds;
 
     const cbData: (Tile | null)[][] = [];
     for (let y = minY; y <= maxY; y++) {
       const row: (Tile | null)[] = [];
       for (let x = minX; x <= maxX; x++) {
-        const t = grid[y][x];
+        const t = grid[y]?.[x];
         row.push(t && !t.isLocked ? JSON.parse(JSON.stringify(t)) : null);
       }
       cbData.push(row);
@@ -675,13 +666,15 @@ export default function App() {
   };
 
   const handleDeleteSelection = (keepSelection: boolean = false) => {
+    if (!selectionBounds) return;
+    const { minX, maxX, minY, maxY } = selectionBounds;
     saveState();
     setGrid((prev) =>
-      prev.map((row) =>
-        row.map((t) => (t && !t.isLocked ? null : t))
+      prev.map((row, y) =>
+        row.map((t, x) => (y >= minY && y <= maxY && x >= minX && x <= maxX && t && !t.isLocked ? null : t))
       )
     );
-    if (!keepSelection) setHasSelection(false);
+    if (!keepSelection) setSelectionBounds(null);
   };
 
   // JSON Export / Import
@@ -875,10 +868,11 @@ export default function App() {
           onOpenModal={handleOpenModal}
           onUpdateMeterValues={setMeterValues}
           onSaveState={saveState}
-          onSelectionChange={setHasSelection}
+          onSelectionChange={setSelectionBounds}
           onUndo={handleUndo}
           onSetTool={handleSetTool}
           onLoadLogicLevel={handleLoadLogicLevel}
+          onRotatePlacement={handleRotatePlacement}
         />
 
         <RightSidebar
@@ -894,6 +888,9 @@ export default function App() {
           hasSelection={hasSelection}
           isPasting={currentTool === 'paste'}
           autowireCount={autowireWaypoints.length}
+          placementType={placementType}
+          placementSubtype={placementSubtype}
+          placementRotation={placementRotation}
           onSetTool={handleSetTool}
           onSetMeterChannel={setMeterChannel}
           onSetPlacement={handleSetPlacement}

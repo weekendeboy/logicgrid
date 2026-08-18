@@ -80,43 +80,76 @@ function getDir(f: Waypoint, t: Waypoint): number {
 }
 
 export function layWiresOnPath(path: Waypoint[], grid: (Tile | null)[][], createTile: (subtype: string, rot: number) => Tile) {
-  for (let i = 1; i < path.length - 1; i++) {
-    const prev = path[i - 1];
+  for (let i = 0; i < path.length; i++) {
     const curr = path[i];
-    const next = path[i + 1];
+    
+    // Do not overwrite non-wire components
+    const existing = grid[curr.y]?.[curr.x];
+    if (existing && existing.type !== 'wire') {
+      continue;
+    }
 
-    const dIn = getDir(curr, prev);
-    const dOut = getDir(curr, next);
-    const pins = [dIn, dOut].sort((a, b) => a - b);
     let subtype = 'straight';
     let rot = 0;
 
-    if (pins[0] === 0 && pins[1] === 2) {
-      subtype = 'straight';
-      rot = 0;
-    } else if (pins[0] === 1 && pins[1] === 3) {
-      subtype = 'straight';
-      rot = 1;
-    } else if (pins[0] === 0 && pins[1] === 1) {
-      subtype = 'turn';
-      rot = 0;
-    } else if (pins[0] === 1 && pins[1] === 2) {
-      subtype = 'turn';
-      rot = 1;
-    } else if (pins[0] === 2 && pins[1] === 3) {
-      subtype = 'turn';
-      rot = 2;
-    } else if (pins[0] === 0 && pins[1] === 3) {
-      subtype = 'turn';
-      rot = 3;
+    if (i === 0) {
+      if (path.length > 1) {
+        const next = path[1];
+        const dOut = getDir(curr, next);
+        rot = (dOut % 2 === 0) ? 0 : 1;
+      }
+    } else if (i === path.length - 1) {
+      if (path.length > 1) {
+        const prev = path[i - 1];
+        const dIn = getDir(curr, prev);
+        rot = (dIn % 2 === 0) ? 0 : 1;
+      }
+    } else {
+      const prev = path[i - 1];
+      const next = path[i + 1];
+
+      const dIn = getDir(curr, prev);
+      const dOut = getDir(curr, next);
+
+      const pins = [dIn, dOut].sort((a, b) => a - b);
+
+      if (pins[0] === 0 && pins[1] === 2) {
+        subtype = 'straight';
+        rot = 0;
+      } else if (pins[0] === 1 && pins[1] === 3) {
+        subtype = 'straight';
+        rot = 1;
+      } else if (pins[0] === 0 && pins[1] === 1) {
+        subtype = 'turn';
+        rot = 0;
+      } else if (pins[0] === 1 && pins[1] === 2) {
+        subtype = 'turn';
+        rot = 1;
+      } else if (pins[0] === 2 && pins[1] === 3) {
+        subtype = 'turn';
+        rot = 2;
+      } else if (pins[0] === 0 && pins[1] === 3) {
+        subtype = 'turn';
+        rot = 3;
+      }
     }
 
-    const existing = grid[curr.y][curr.x];
     if (existing && existing.type === 'wire') {
       if (existing.subtype === 'straight') {
-        subtype = 'bridge';
-        rot = existing.rotation;
+        if (subtype === 'straight' && existing.rotation === rot) {
+          // It's the same direction, leave it as is
+          subtype = 'straight';
+        } else if (subtype === 'straight' && existing.rotation !== rot && i > 0 && i < path.length - 1) {
+          // If it's a passing-through wire, make it a bridge to avoid shorting
+          subtype = 'bridge';
+          rot = existing.rotation;
+        } else {
+          // If it's turning or an endpoint, it should connect to the existing wire, so use cross
+          subtype = 'cross';
+          rot = 0;
+        }
       } else {
+        // If it's already a turn or cross, just upgrade/keep it as cross
         subtype = 'cross';
         rot = 0;
       }

@@ -17,7 +17,7 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
     else if (t.subtype === 't') groups = [[1, 2, 3]];
     else if (t.subtype === 'cross') groups = [[0, 1, 2, 3]];
     else if (t.subtype === 'bridge') groups = [[0, 2], [1, 3]];
-    else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g') groups = [[2]];
+    else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g' || t.subtype === 'plus' || t.subtype === 'minus' || t.subtype === 'ground') groups = [[2]];
   } else {
     if (mode === 'electronic') {
       if (t.type === 'power' || t.type === 'resistor' || t.type === 'led' || t.type === 'capacitor') {
@@ -37,30 +37,39 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
         else groups = [[0], [1], [2]];
       }
     } else if (mode === 'wiring' || mode === 'plc') {
-      if (t.type === 'btn' || (t.type === 'relay' && (t.subtype === 'no' || t.subtype === 'nc'))) {
-        const closed =
-          (t.subtype === 'no' && act) ||
-          (t.subtype === 'nc' && !act) ||
-          (t.type === 'btn' && t.subtype === 'no' && act) ||
-          (t.type === 'btn' && t.subtype === 'nc' && !act);
-        groups = closed ? [[0, 2]] : [[0], [2]];
+      const isRelayContact = t.type === 'relay' && (
+        t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
+        t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+      );
+      if (t.type === 'btn' || isRelayContact) {
+        const isCon = t.subtype === 'con' || t.subtype === 'ton_con' || t.subtype === 'tof_con';
+        const isNo = t.subtype === 'no' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && t.subtype === 'no');
+        const isNc = t.subtype === 'nc' || t.subtype === 'ton_nc' || t.subtype === 'tof_nc' || (t.type === 'btn' && t.subtype === 'nc');
+
+        if (isCon) {
+          groups = act ? [[0, 1], [2]] : [[0, 2], [1]];
+        } else {
+          const closed = (isNo && act) || (isNc && !act);
+          groups = closed ? [[0, 2]] : [[0], [2]];
+        }
       } else if (t.type === 'breaker') {
         groups = t.isActive ? [[0, 2]] : [[0], [2]];
       } else if (t.type === 'switch' && t.subtype === 'sel13') {
         const st = t.state || 0;
-        if (st === 0) groups = [[0, 3]]; // Left
-        else if (st === 1) groups = [[0, 2]]; // Down
-        else if (st === 2) groups = [[0, 1]]; // Right
+        if (st === 0) groups = [[2, 0]]; // Top
+        else groups = [[2, 1]]; // Right
+      } else if (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')) {
+        // Inter-tile connections are handled strictly in buildNetState to prevent shorting
+        groups = [[3], [1]];
       } else if (t.type === 'protection' && t.subtype === 'fuse') {
         groups = t.isBlown ? [[0], [2]] : [[0, 2]];
       } else if (t.type === 'terminal') {
-        groups = [[0, 2]];
+        groups = [[2]];
       } else if (
         t.subtype === 'coil' ||
-        t.subtype === 'ton' ||
-        t.subtype === 'tof' ||
         t.type === 'motor' ||
-        t.type === 'load'
+        t.type === 'load' ||
+        t.type === 'power'
       ) {
         groups = [[0], [2]];
       } else if (t.type === 'pneumatic') {
@@ -139,6 +148,24 @@ export function buildNetState(
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
+      const t = grid[y][x];
+      if (t && t.type === 'switch' && t.subtype === '4way_top') {
+        const bot = y + 1 < h ? grid[y + 1][x] : null;
+        if (bot && bot.type === 'switch' && bot.subtype === '4way_bot' && t.groupId === bot.groupId) {
+          const st = (t.isActive || t.isPhysicallyPushed) ? 1 : 0;
+          if (st === 0) {
+            // Cross connection: Top-Left (3) to Bot-Right (1), Top-Right (1) to Bot-Left (3)
+            // But user says: 1(Top-Left) to 4(Bot-Right), 2(Bot-Left) to 3(Top-Right)
+            ds.union(`${x},${y},3`, `${x},${y+1},1`);
+            ds.union(`${x},${y},1`, `${x},${y+1},3`);
+          } else {
+            // Parallel connection: Top-Left (3) to Bot-Left (3), Top-Right (1) to Bot-Right (1)
+            ds.union(`${x},${y},3`, `${x},${y+1},3`);
+            ds.union(`${x},${y},1`, `${x},${y+1},1`);
+          }
+        }
+      }
+
       for (let d = 0; d < 4; d++) {
         const node1 = `${x},${y},${d}`;
         if (!ds.has(node1) || openSet.has(node1)) continue;
@@ -161,6 +188,27 @@ export function buildNetState(
   }
 
   if (mode === 'wiring' || mode === 'plc') {
+    const terminalsByLabel: Record<string, string[]> = {};
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = grid[y][x];
+        if (t && t.type === 'terminal' && t.subtype === 'block' && t.labels[4]) {
+          const lbl = t.labels[4];
+          if (!terminalsByLabel[lbl]) terminalsByLabel[lbl] = [];
+          const rot = t.rotation || 0;
+          terminalsByLabel[lbl].push(`${x},${y},${(2 + rot) % 4}`);
+        }
+      }
+    }
+    for (const lbl in terminalsByLabel) {
+      const nodes = terminalsByLabel[lbl];
+      for (let i = 1; i < nodes.length; i++) {
+        if (ds.has(nodes[0]) && ds.has(nodes[i])) {
+          ds.union(nodes[0], nodes[i]);
+        }
+      }
+    }
+
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const t = grid[y][x];

@@ -43,10 +43,11 @@ interface CanvasWorkspaceProps {
   onOpenModal: (t: Tile, mode: 'value' | 'color' | 'timer' | 'label', pos: { x: number; y: number }) => void;
   onUpdateMeterValues: (vals: { vVal: number; aVal: number; wVal: number; oscVal: number | null }) => void;
   onSaveState: () => void;
-  onSelectionChange: (hasSel: boolean) => void;
+  onSelectionChange: (bounds: { minX: number; maxX: number; minY: number; maxY: number } | null) => void;
   onUndo: () => void;
   onSetTool: (tool: ToolType) => void;
   onLoadLogicLevel: (level: LogicLevelId) => void;
+  onRotatePlacement: () => void;
 }
 
 const TILE_SIZE = 80;
@@ -78,6 +79,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onUndo,
   onSetTool,
   onLoadLogicLevel,
+  onRotatePlacement,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -90,6 +92,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     null,
   ]);
   const [shortSelectionNode, setShortSelectionNode] = useState<string | null>(null);
+  const [movingTiles, setMovingTiles] = useState<{ dx: number; dy: number; ox: number; oy: number; tile: Tile }[] | null>(null);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
@@ -269,29 +272,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // Drag-holding interactive buttons
     if (currentTool === 'interact' && e.buttons === 1) {
       const t = grid[my]?.[mx];
-      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn'))) {
+      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
         setGrid((prev) => {
-          const next = prev.map((row) => [...row]);
-          const curr = next[my][mx];
-          if (curr) {
-            curr.isActive = true;
-            if (curr.labels && curr.labels[4]) {
-              const lbl = curr.labels[4];
-              for (let r = 0; r < gridSize; r++) {
-                for (let c = 0; c < gridSize; c++) {
-                  const ot = next[r][c];
-                  if (
-                    ot &&
-                    (ot.type === 'btn' || (ot.type === 'logic' && ot.subtype === 'pushbtn')) &&
-                    ot.labels[4] === lbl
-                  ) {
-                    ot.isActive = true;
-                  }
-                }
+          const curr = prev[my][mx];
+          if (!curr) return prev;
+          return prev.map((row) =>
+            row.map((c) => {
+              if (c === curr) return Object.assign(new Tile(), c, { isActive: true });
+              if (c && curr.groupId && c.groupId === curr.groupId) return Object.assign(new Tile(), c, { isActive: true });
+              if (
+                c && curr.labels && curr.labels[4] &&
+                c.labels && c.labels[4] === curr.labels[4] &&
+                (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
+              ) {
+                return Object.assign(new Tile(), c, { isActive: true });
               }
-            }
-          }
-          return next;
+              return c;
+            })
+          );
         });
       }
     }
@@ -356,33 +354,96 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    // Move Tool
+    if (currentTool === 'move') {
+      if (movingTiles) {
+        let canPlace = true;
+        for (const mt of movingTiles) {
+          const nx = mousePos.x + mt.dx;
+          const ny = mousePos.y + mt.dy;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) {
+            canPlace = false;
+            break;
+          }
+          if (grid[ny][nx] !== null) {
+            canPlace = false;
+            break;
+          }
+        }
+        if (canPlace) {
+          onSaveState();
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            for (const mt of movingTiles) {
+              const nx = mousePos.x + mt.dx;
+              const ny = mousePos.y + mt.dy;
+              next[ny][nx] = mt.tile;
+            }
+            return next;
+          });
+          setMovingTiles(null);
+        } else {
+          onShowAlert('該位置已有元件或超出邊界！');
+        }
+      } else {
+        const ct = grid[mousePos.y][mousePos.x];
+        if (ct) {
+          const toMove = [];
+          if (ct.groupId) {
+            for (let y = 0; y < gridSize; y++) {
+              for (let x = 0; x < gridSize; x++) {
+                if (grid[y][x] && grid[y][x].groupId === ct.groupId) {
+                  toMove.push({ x, y, tile: grid[y][x] });
+                }
+              }
+            }
+          } else {
+            toMove.push({ x: mousePos.x, y: mousePos.y, tile: ct });
+          }
+          
+          const moveData = toMove.map(m => ({
+            dx: m.x - mousePos.x,
+            dy: m.y - mousePos.y,
+            ox: m.x,
+            oy: m.y,
+            tile: m.tile
+          }));
+          
+          onSaveState();
+          setGrid(prev => {
+            const next = prev.map(row => [...row]);
+            for (const m of toMove) {
+              next[m.y][m.x] = null;
+            }
+            return next;
+          });
+          setMovingTiles(moveData);
+        }
+      }
+      return;
+    }
     const t = grid[mousePos.y][mousePos.x];
 
     // Interact Mode
     if (currentTool === 'interact') {
-      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn'))) {
+      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
         setGrid((prev) => {
-          const next = prev.map((row) => [...row]);
-          const curr = next[mousePos.y][mousePos.x];
-          if (curr) {
-            curr.isActive = true;
-            if (curr.labels && curr.labels[4]) {
-              const lbl = curr.labels[4];
-              for (let r = 0; r < gridSize; r++) {
-                for (let c = 0; c < gridSize; c++) {
-                  const ot = next[r][c];
-                  if (
-                    ot &&
-                    (ot.type === 'btn' || (ot.type === 'logic' && ot.subtype === 'pushbtn')) &&
-                    ot.labels[4] === lbl
-                  ) {
-                    ot.isActive = true;
-                  }
-                }
+          const curr = prev[mousePos.y][mousePos.x];
+          if (!curr) return prev;
+          return prev.map((row) =>
+            row.map((c) => {
+              if (c === curr) return Object.assign(new Tile(), c, { isActive: true });
+              if (c && curr.groupId && c.groupId === curr.groupId) return Object.assign(new Tile(), c, { isActive: true });
+              if (
+                c && curr.labels && curr.labels[4] &&
+                c.labels && c.labels[4] === curr.labels[4] &&
+                (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
+              ) {
+                return Object.assign(new Tile(), c, { isActive: true });
               }
-            }
-          }
-          return next;
+              return c;
+            })
+          );
         });
       } else if (t && t.type === 'breaker') {
         const ns = !t.isActive;
@@ -391,15 +452,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             row.map((c) => (c && c.groupId === t.groupId ? Object.assign(new Tile(), c, { isActive: ns }) : c))
           )
         );
-      } else if (t && t.type === 'switch' && t.subtype === 'sel13') {
-        const st = ((t.state || 0) + 1) % 3;
-        setGrid((prev) => {
-          const next = prev.map((row) => [...row]);
-          if (next[mousePos.y][mousePos.x]) {
-            next[mousePos.y][mousePos.x]!.state = st;
-          }
-          return next;
-        });
+      } else if (t && t.type === 'switch') {
+        if (t.subtype === 'sel13') {
+          const st = ((t.state || 0) + 1) % 2;
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            if (next[mousePos.y][mousePos.x]) {
+              next[mousePos.y][mousePos.x]!.state = st;
+            }
+            return next;
+          });
+        }
       } else if (t && t.type === 'logic' && t.subtype === 'power') {
         const ns = !t.isActive;
         setGrid((prev) => {
@@ -432,7 +495,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           t.type === 'terminal' ||
           (t.type === 'pneumatic' && (t.subtype === 'valve_coil' || t.subtype === 'valve_52')))
       ) {
-        if (t.subtype === 'ton' || t.subtype === 'tof') onOpenModal(t, 'timer', mousePos);
+        if (t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')) onOpenModal(t, 'timer', mousePos);
         else onOpenModal(t, 'label', mousePos);
       } else if (t && t.type === 'load' && t.subtype === 'lightbulb') {
         onOpenModal(t, 'color', mousePos);
@@ -448,14 +511,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     } else if (currentTool === 'label') {
       if (t) {
-        if (t.subtype === 'ton' || t.subtype === 'tof') onOpenModal(t, 'timer', mousePos);
+        if (t.subtype.startsWith('ton') || t.subtype.startsWith('tof') || t.subtype === 'flash_coil') onOpenModal(t, 'timer', mousePos);
         else onOpenModal(t, 'label', mousePos);
       }
     } else if (currentTool === 'select') {
       setIsSelecting(true);
       setSelectStart({ ...mousePos });
       setSelectEnd({ ...mousePos });
-      onSelectionChange(false);
+      onSelectionChange(null);
     } else if (currentTool === 'paste') {
       if (!clipboard || checkInterference()) {
         onShowAlert('無法貼上：區域有干涉或超出邊界！');
@@ -602,13 +665,21 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (
         placementType === 'relay' &&
         (placementSubtype === 'coil' ||
-          placementSubtype === 'ton' ||
-          placementSubtype === 'tof' ||
           placementSubtype === 'no' ||
-          placementSubtype === 'nc')
+          placementSubtype === 'nc' ||
+          placementSubtype === 'con' ||
+          placementSubtype.startsWith('ton_') ||
+          placementSubtype.startsWith('tof_') ||
+          placementSubtype === 'flash_coil' ||
+          placementSubtype === 'impulse_coil')
       ) {
-        const isTimer = placementSubtype === 'ton' || placementSubtype === 'tof';
-        const prefix = isTimer ? 'T' : 'K';
+        const isTimerContact = placementSubtype.startsWith('ton_') || placementSubtype.startsWith('tof_');
+        const isFlashCoil = placementSubtype === 'flash_coil';
+        const isImpulseCoil = placementSubtype === 'impulse_coil';
+        let prefix = 'K';
+        if (isTimerContact) prefix = 'T';
+        if (isFlashCoil) prefix = 'F';
+        if (isImpulseCoil) prefix = 'P';
         let maxNum = 0;
         for (const r of grid) {
           for (const c of r) {
@@ -622,20 +693,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             }
           }
         }
-        const newT = new Tile(placementType, placementSubtype, isTimer ? 3000 : 0);
-        if (placementSubtype === 'coil' || isTimer) {
-          newT.labels[4] = prefix + (maxNum + 1);
-        } else {
-          let maxK = 0;
-          for (const r of grid) {
-            for (const c of r) {
-              if (c && c.type === 'relay' && c.labels[4] && c.labels[4].match(/^K\d+$/)) {
-                maxK = Math.max(maxK, parseInt(c.labels[4].substring(1)));
-              }
-            }
-          }
-          newT.labels[4] = 'K' + Math.max(1, maxK);
-        }
+        const newT = new Tile(placementType, placementSubtype, (isTimerContact || isFlashCoil) ? 1000 : 0);
+        newT.labels[4] = prefix + (maxNum + 1);
         setGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
@@ -694,6 +753,42 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           next[mousePos.y][mousePos.x] = newT;
           return next;
         });
+      } else if (placementType === 'power' && placementSubtype === 'psu') {
+        if (
+          mousePos.x + 1 < gridSize &&
+          !grid[mousePos.y][mousePos.x] &&
+          !grid[mousePos.y][mousePos.x + 1]
+        ) {
+          const gid = 'psu_' + Date.now();
+          const left = new Tile('power', 'psu_left');
+          left.groupId = gid;
+          const right = new Tile('power', 'psu_right');
+          right.groupId = gid;
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = left;
+            next[mousePos.y][mousePos.x + 1] = right;
+            return next;
+          });
+        }
+      } else if (placementType === 'switch' && placementSubtype === '4way') {
+        if (
+          mousePos.y + 1 < gridSize &&
+          !grid[mousePos.y][mousePos.x] &&
+          !grid[mousePos.y + 1][mousePos.x]
+        ) {
+          const gid = 'sw4_' + Date.now();
+          const top = new Tile('switch', '4way_top');
+          top.groupId = gid;
+          const bot = new Tile('switch', '4way_bot');
+          bot.groupId = gid;
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = top;
+            next[mousePos.y + 1][mousePos.x] = bot;
+            return next;
+          });
+        }
       } else if (placementType === 'breaker' && placementSubtype === 'mcb') {
         if (
           mousePos.x + 1 < gridSize &&
@@ -773,7 +868,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         else if (placementType === 'logic' && placementSubtype === 'clock') dVal = 1;
 
         const newT = new Tile(placementType, placementSubtype, dVal);
-        if (placementType === 'wire') newT.rotation = placementRotation;
+        newT.rotation = placementRotation;
+
+        if (placementType === 'btn' && placementSubtype === 'no') {
+          newT.labels[1] = '13';
+          newT.labels[2] = '14';
+        } else if (placementType === 'btn' && placementSubtype === 'nc') {
+          newT.labels[1] = '11';
+          newT.labels[2] = '12';
+        }
 
         setGrid((prev) => {
           const next = prev.map((row) => [...row]);
@@ -799,14 +902,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         b.maxY >= b.minY &&
         (b.maxX > b.minX || b.maxY > b.minY || grid[b.minY]?.[b.minX])
       ) {
-        onSelectionChange(true);
+        onSelectionChange(b);
       }
     }
     // Release active pushbuttons
     setGrid((prev) =>
       prev.map((row) =>
         row.map((c) =>
-          c && (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn'))
+          c && (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
             ? Object.assign(new Tile(), c, { isActive: false })
             : c
         )
@@ -817,7 +920,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Context Menu Rotation
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    rotateTileGroup(mousePos.x, mousePos.y);
+    if (currentTool === 'place') {
+      onRotatePlacement();
+    } else {
+      rotateTileGroup(mousePos.x, mousePos.y);
+    }
   };
 
   // Keyboard events
@@ -829,17 +936,31 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         return;
       }
       if (e.key === 'r' || e.key === 'R') {
-        rotateTileGroup(mousePos.x, mousePos.y);
+        if (currentTool === 'place') {
+          onRotatePlacement();
+        } else {
+          rotateTileGroup(mousePos.x, mousePos.y);
+        }
       }
       if (e.key === 'Escape') {
         if (currentTool === 'paste') onSetTool('interact');
-        if (currentTool === 'select') onSelectionChange(false);
+        if (currentTool === 'select') onSelectionChange(null);
+        if (currentTool === 'move' && movingTiles) {
+          setGrid(prev => {
+            const next = prev.map(row => [...row]);
+            for (const mt of movingTiles) {
+              next[mt.oy][mt.ox] = mt.tile;
+            }
+            return next;
+          });
+          setMovingTiles(null);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rotateTileGroup, mousePos, currentTool, onUndo, onSetTool, onSelectionChange]);
+  }, [rotateTileGroup, mousePos, currentTool, onUndo, onSetTool, onSelectionChange, onRotatePlacement]);
 
   // Main Render Loop
   useEffect(() => {
@@ -1000,6 +1121,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 if (
                   i === 4 &&
                   (t.type === 'plc' ||
+                    t.type === 'terminal' ||
                     t.subtype === 'no' ||
                     t.subtype === 'nc' ||
                     t.subtype === 'pls' ||
@@ -1011,6 +1133,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                     t.subtype === 'plc_pls' ||
                     t.subtype === 'plc_plf' ||
                     t.subtype === 'out' ||
+                    t.subtype === 'con' ||
+                    t.subtype === 'coil' ||
+                    t.subtype === 'ton' ||
+                    t.subtype === 'tof' ||
+                    t.subtype.startsWith('ton_') ||
+                    t.subtype.startsWith('tof_') ||
+                    t.subtype === 'flash_coil' ||
+                    t.subtype === 'impulse_coil' ||
                     t.subtype === 'plc_out')
                 ) {
                   continue;
@@ -1172,6 +1302,16 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 ghostTiles.push({ x: mousePos.x + dx, y: mousePos.y + dy, tile });
               }
             }
+          } else if (pType === 'power' && pSubtype === 'psu') {
+            const left = new Tile('power', 'psu_left');
+            const right = new Tile('power', 'psu_right');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: left });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: right });
+          } else if (pType === 'switch' && pSubtype === '4way') {
+            const top = new Tile('switch', '4way_top');
+            const bot = new Tile('switch', '4way_bot');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: top });
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y + 1, tile: bot });
           } else if (pType === 'breaker' && pSubtype === 'mcb') {
             const t1 = new Tile('breaker', 'mcb');
             const t2 = new Tile('breaker', 'mcb');
@@ -1194,6 +1334,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           } else {
             const ghostTile = new Tile(pType, pSubtype);
             ghostTile.rotation = placementRotation;
+
+            if (pType === 'btn' && pSubtype === 'no') {
+              ghostTile.labels[1] = '13';
+              ghostTile.labels[2] = '14';
+            } else if (pType === 'btn' && pSubtype === 'nc') {
+              ghostTile.labels[1] = '11';
+              ghostTile.labels[2] = '12';
+            }
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: ghostTile });
           }
 
@@ -1239,6 +1387,46 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           }
           ctx.globalAlpha = 1.0;
         }
+      }
+
+      if (currentTool === 'move' && movingTiles) {
+        ctx.globalAlpha = 0.5;
+        let canPlace = true;
+        for (const mt of movingTiles) {
+          const nx = mousePos.x + mt.dx;
+          const ny = mousePos.y + mt.dy;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) {
+            canPlace = false;
+            break;
+          }
+          if (grid[ny]?.[nx]) {
+            canPlace = false;
+            break;
+          }
+        }
+
+        if (canPlace) {
+           for (const mt of movingTiles) {
+               const nx = mousePos.x + mt.dx;
+               const ny = mousePos.y + mt.dy;
+               renderTileInstance(ctx, currentMode, nx, ny, mt.tile, [
+                  '#94a3b8',
+                  '#94a3b8',
+                  '#94a3b8',
+                  '#94a3b8',
+               ]);
+           }
+        } else {
+           ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+           for (const mt of movingTiles) {
+               const nx = mousePos.x + mt.dx;
+               const ny = mousePos.y + mt.dy;
+               if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                   ctx.fillRect(nx * TILE_SIZE, ny * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+               }
+           }
+        }
+        ctx.globalAlpha = 1.0;
       }
 
       // Auto-wire preview
@@ -1389,6 +1577,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     checkInterference,
     onShowAlert,
     onUpdateMeterValues,
+    placementType,
+    placementSubtype,
+    placementRotation,
   ]);
 
   // Render individual tile component graphics
@@ -1505,21 +1696,47 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.beginPath();
         ctx.arc(0, 0, 12, Math.PI, 0);
         ctx.stroke();
-      } else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g') {
-        const isHigh = t.subtype === 'l' || t.subtype === 'h';
-        const labelText = t.subtype === 'h' ? 'H' : t.subtype === 'g' ? 'G' : t.subtype.toUpperCase();
+      } else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g' || t.subtype === 'plus' || t.subtype === 'minus' || t.subtype === 'ground') {
         line(0, 0, 0, 40, c[2]);
 
-        ctx.fillStyle = isHigh ? '#ef4444' : '#3b82f6';
-        ctx.beginPath();
-        ctx.arc(0, -6, 12, 0, Math.PI * 2);
-        ctx.fill();
+        if (t.subtype === 'ground') {
+          ctx.strokeStyle = c[2] || '#94a3b8';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, 0); ctx.lineTo(0, -10);
+          ctx.moveTo(-12, -10); ctx.lineTo(12, -10);
+          ctx.moveTo(-8, -16); ctx.lineTo(8, -16);
+          ctx.moveTo(-4, -22); ctx.lineTo(4, -22);
+          ctx.stroke();
+          
+          ctx.fillStyle = c[2] || '#94a3b8';
+          ctx.fillRect(-3, -25, 6, 6);
+        } else {
+          const isHigh = t.subtype === 'l' || t.subtype === 'h' || t.subtype === 'plus';
+          const isOrange = t.subtype === 'plus';
+          const isIndigo = t.subtype === 'minus';
+          
+          let labelText = t.subtype.toUpperCase();
+          if (t.subtype === 'h') labelText = 'H';
+          if (t.subtype === 'g') labelText = 'G';
+          if (t.subtype === 'plus') labelText = '+';
+          if (t.subtype === 'minus') labelText = '-';
+          
+          let bgColor = isHigh ? '#ef4444' : '#3b82f6';
+          if (isOrange) bgColor = '#f97316';
+          if (isIndigo) bgColor = '#6366f1';
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(labelText, 0, -5);
+          ctx.fillStyle = bgColor;
+          ctx.beginPath();
+          ctx.arc(0, -6, 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 13px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(labelText, 0, -5);
+        }
       }
     } else if (t.type === 'misc' && t.subtype === 'blank') {
       ctx.strokeStyle = '#334155';
@@ -1543,7 +1760,54 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.fillText('Note', 0, 0);
       }
     } else if (t.type === 'power') {
-      if (t.subtype === 'dc24') {
+      if (t.subtype === 'psu_left' || t.subtype === 'psu_right') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+
+        if (t.subtype === 'psu_left') {
+          // Left tile: draws the entire unified box
+          ctx.beginPath();
+          ctx.moveTo(0, -40); ctx.lineTo(0, -20);
+          ctx.moveTo(0, 40); ctx.lineTo(0, 20);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#1e293b'; // Solid dark background for the box
+          ctx.fillRect(-20, -20, 120, 40);
+          ctx.strokeRect(-20, -20, 120, 40);
+          
+          // Diagonal line in the middle
+          ctx.beginPath();
+          ctx.moveTo(20, 20);
+          ctx.lineTo(60, -20);
+          ctx.stroke();
+          
+          // Labels
+          ctx.fillStyle = '#06b6d4'; // Cyan for labels
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          ctx.fillText('L', -10, -10);
+          ctx.fillText('+', -10, 10);
+          
+          ctx.fillText('N', 90, -10);
+          ctx.fillText('-', 90, 10);
+          
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText('~', 30, -5);
+          ctx.fillText('=', 50, 7);
+        } else {
+          // Right tile: only draws the pins and connecting wires
+          ctx.beginPath();
+          ctx.moveTo(0, -40); ctx.lineTo(0, -20);
+          ctx.moveTo(0, 40); ctx.lineTo(0, 20);
+          ctx.stroke();
+        }
+      } else if (t.subtype === 'dc24') {
         drawPin(0, 10);
         drawPin(2, 10);
         ctx.fillStyle = '#334155';
@@ -1820,96 +2084,256 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.stroke();
         }
       } else if (t.type === 'terminal') {
-        drawPin(0, 16);
-        drawPin(2, 16);
-        ctx.fillStyle = '#475569';
+        const col = t.isPowered ? '#ef4444' : '#64748b';
+        
+        drawPin(2, 26);
+        
+        ctx.fillStyle = col;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(-16, -20, 32, 40, 4);
-        else ctx.rect(-16, -20, 32, 40);
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 2;
-        ctx.stroke();
 
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.arc(0, -10, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-3, -10);
-        ctx.lineTo(3, -10);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, 10, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-3, 10);
-        ctx.lineTo(3, 10);
-        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(t.labels[4] || 'TB', 0, 0);
       } else if (
         t.type === 'btn' ||
-        (t.type === 'relay' && (t.subtype === 'no' || t.subtype === 'nc'))
+        (t.type === 'relay' && (
+          t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
+          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+        ))
       ) {
+        const isCon = t.subtype === 'con' || t.subtype === 'ton_con' || t.subtype === 'tof_con';
+        const isNo = t.subtype === 'no' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && t.subtype === 'no');
+        const isNc = t.subtype === 'nc' || t.subtype === 'ton_nc' || t.subtype === 'tof_nc' || (t.type === 'btn' && t.subtype === 'nc');
+
+        const isTon = t.type === 'relay' && t.subtype.startsWith('ton_');
+        const isTof = t.type === 'relay' && t.subtype.startsWith('tof_');
+
+        if (isCon) {
+          drawPin(0, 16);
+          drawPin(1, 16);
+          drawPin(2, 16);
+
+
+
+          const isActuated = t.isActive || t.isPhysicallyPushed;
+
+          // Terminal squares
+          ctx.fillStyle = isActuated ? '#10b981' : '#94a3b8';
+          ctx.fillRect(-3, -18, 6, 6);
+          ctx.fillRect(12, -3, 6, 6);
+          ctx.fillRect(-3, 12, 6, 6);
+
+          // Terminal extensions
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, -24);
+          ctx.lineTo(0, -15);
+          ctx.moveTo(24, 0);
+          ctx.lineTo(15, 0);
+          ctx.moveTo(0, 24);
+          ctx.lineTo(0, 15);
+          ctx.stroke();
+
+          // CON switch arm
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, -15);
+          if (isActuated) {
+            // connects to NO (pin 1, right)
+            ctx.lineTo(12, 3);
+          } else {
+            // connects to NC (pin 2, bottom)
+            ctx.lineTo(-5, 12);
+          }
+          ctx.stroke();
+
+          // Draw TON/TOF umbrella for CON
+          if (isTon || isTof) {
+             ctx.strokeStyle = '#cbd5e1';
+             ctx.lineWidth = 3;
+             ctx.beginPath();
+             
+             // Midpoints
+             const cx = isActuated ? 6 : -2.5;
+             const cy = isActuated ? -6 : -1.5;
+             
+             ctx.moveTo(cx, cy);
+             ctx.lineTo(cx - 10, cy);
+             ctx.stroke();
+             
+             ctx.beginPath();
+             if (isTon) {
+                ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, false);
+             } else if (isTof) {
+                ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, true);
+             }
+             ctx.stroke();
+          }
+
+          // Labels
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(t.labels[4] || 'K1', 0, 36);
+          // Label texts for pins
+          ctx.font = '9px Arial';
+          ctx.fillStyle = '#94a3b8';
+          if (t.labels[0]) ctx.fillText(t.labels[0], -14, -28);
+          if (t.labels[1]) ctx.fillText(t.labels[1], 28, -12);
+          if (t.labels[2]) ctx.fillText(t.labels[2], -14, 28);
+          
+          ctx.restore();
+          return;
+        }
         drawPin(0, 16);
         drawPin(2, 16);
 
-        // Add a visible body box
-        ctx.fillStyle = '#1e293b';
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(-24, -24, 48, 48, 6);
-        else ctx.rect(-24, -24, 48, 48);
-        ctx.fill();
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 2;
-        ctx.stroke();
 
-        const isClosed =
-          t.subtype === 'no'
+
+        const isClosed = isNo
             ? t.isActive || t.isPhysicallyPushed
-            : t.subtype === 'nc'
+            : isNc
             ? !(t.isActive || t.isPhysicallyPushed)
             : false;
 
-        ctx.fillStyle =
-          t.type === 'btn'
-            ? t.isActive || t.isPhysicallyPushed
-              ? '#10b981'
-              : '#475569'
-            : '#475569';
+        const isActuated = t.isActive || t.isPhysicallyPushed;
+
+        // Terminal dots/squares
+        ctx.fillStyle = isActuated ? '#10b981' : '#94a3b8';
+        ctx.fillRect(-3, -18, 6, 6);
+        ctx.fillRect(-3, 12, 6, 6);
+
+        // Terminal extensions
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(0, -16, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(0, 16, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(0, -24);
+        ctx.lineTo(0, -15);
+        ctx.moveTo(0, 24);
+        ctx.lineTo(0, 15);
+        ctx.stroke();
 
         ctx.strokeStyle = isClosed ? '#10b981' : '#cbd5e1';
-        ctx.lineWidth = 4;
-        if (t.subtype === 'nc') {
-          if (!(t.isActive || t.isPhysicallyPushed)) {
-            ctx.beginPath();
-            ctx.moveTo(-12, -16);
-            ctx.lineTo(-12, 16);
-            ctx.stroke();
+        ctx.lineWidth = 3;
+
+        if (isNo) {
+          // NO contact
+          ctx.beginPath();
+          if (isTon || isTof) {
+            ctx.moveTo(0, 15);
+            ctx.lineTo(0, 4);
+            ctx.lineTo(isClosed ? 0 : -10, -15);
           } else {
-            ctx.beginPath();
-            ctx.moveTo(-18, -12);
-            ctx.lineTo(-18, 20);
-            ctx.stroke();
+            ctx.moveTo(0, 12);
+            ctx.lineTo(isClosed ? 0 : -10, -12);
           }
-        } else {
-          if (t.isActive || t.isPhysicallyPushed) {
+          ctx.stroke();
+
+          if (t.type === 'btn') {
+            const eX = isClosed ? -12 : -22;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            
+            // E shape
             ctx.beginPath();
-            ctx.moveTo(-12, -16);
-            ctx.lineTo(-12, 16);
+            ctx.moveTo(eX, -6);
+            ctx.lineTo(eX, 6);
+            ctx.moveTo(eX, -6);
+            ctx.lineTo(eX + 4, -6);
+            ctx.moveTo(eX, 0);
+            ctx.lineTo(eX + 4, 0);
+            ctx.moveTo(eX, 6);
+            ctx.lineTo(eX + 4, 6);
             ctx.stroke();
+
+            // Dashed line
+            ctx.beginPath();
+            ctx.setLineDash([3, 2]);
+            ctx.moveTo(eX + 4, 0);
+            ctx.lineTo(isClosed ? 0 : -5, 0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+        
+        // Draw TON/TOF umbrella / arrow
+        if (isTon || isTof) {
+          ctx.strokeStyle = isClosed ? '#10b981' : '#cbd5e1';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          
+          let cx = 0;
+          let cy = 0;
+          
+          if (isCon) {
+             cx = isActuated ? 6 : -5;
+             cy = isActuated ? -6 : 0;
+          } else if (isNo) {
+             cx = isClosed ? 0 : -5;
+             cy = -5.5; // midpoint of the line from (0,4) to (-10,-15)
+          } else if (isNc) {
+             cx = isClosed ? 0 : 5;
+             cy = -5.5;
+          }
+          
+          // Draw stem
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx - 10, cy);
+          ctx.stroke();
+          
+          // Draw umbrella
+          ctx.beginPath();
+          if (isTon) {
+             // TON: Bulge on the left (Canvas: from 90deg to 270deg clockwise goes through 180deg)
+             ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, false);
+          } else if (isTof) {
+             // TOF: Bulge on the right (Canvas: from 90deg to 270deg counter-clockwise goes through 0deg)
+             ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, true);
+          }
+          ctx.stroke();
+        } else if (isNc) {
+          // NC contact
+          ctx.beginPath();
+          if (isTon || isTof) {
+            ctx.moveTo(0, 15);
+            ctx.lineTo(0, 4);
+            ctx.lineTo(isClosed ? 0 : 10, -15);
           } else {
+            ctx.moveTo(0, 12);
+            ctx.lineTo(isClosed ? 0 : 10, -12);
+          }
+          ctx.stroke();
+
+          if (t.type === 'btn') {
+            const eX = isClosed ? -12 : -2;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            
+            // E shape
             ctx.beginPath();
-            ctx.moveTo(-18, -12);
-            ctx.lineTo(-18, 20);
+            ctx.moveTo(eX, -6);
+            ctx.lineTo(eX, 6);
+            ctx.moveTo(eX, -6);
+            ctx.lineTo(eX + 4, -6);
+            ctx.moveTo(eX, 0);
+            ctx.lineTo(eX + 4, 0);
+            ctx.moveTo(eX, 6);
+            ctx.lineTo(eX + 4, 6);
             ctx.stroke();
+
+            // Dashed line
+            ctx.beginPath();
+            ctx.setLineDash([3, 2]);
+            ctx.moveTo(eX + 4, 0);
+            ctx.lineTo(isClosed ? 0 : 5, 0);
+            ctx.stroke();
+            ctx.setLineDash([]);
           }
         }
 
@@ -1918,43 +2342,198 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.textAlign = 'center';
         ctx.fillText(t.labels[4] || (t.type === 'btn' ? 'BTN' : 'RELAY'), 0, 36);
 
-      } else if (t.type === 'switch' && t.subtype === 'sel13') {
-        drawPin(0, 16);
-        drawPin(1, 16);
-        drawPin(2, 16);
-        drawPin(3, 16);
+      } else if (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')) {
+        const isActuated = t.isActive || t.isPhysicallyPushed;
+        const st = isActuated ? 1 : 0;
+        drawPin(1, 10);
+        drawPin(3, 10);
+        
+        if (t.subtype === '4way_top') {
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-30, 0);
+          ctx.lineTo(-10, 0);
+          ctx.lineTo(-10, 20);
+          ctx.moveTo(30, 0);
+          ctx.lineTo(10, 0);
+          ctx.lineTo(10, 20);
+          ctx.stroke();
 
-        // Add a visible body box
-        ctx.fillStyle = '#1e293b';
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-13, 17, 6, 6);
+          ctx.fillRect(7, 17, 6, 6);
+          ctx.fillStyle = '#10b981'; // Emerald 500 for numbers
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'left';
+          ctx.fillText('1', -5, 20);
+          ctx.fillText('3', 15, 20);
+
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.beginPath();
+          if (st === 0) {
+            ctx.moveTo(0, 40);
+            ctx.lineTo(10, 20);
+            ctx.moveTo(0, 40);
+            ctx.lineTo(-10, 20);
+          } else {
+            ctx.moveTo(-10, 40);
+            ctx.lineTo(-10, 20);
+            ctx.moveTo(10, 40);
+            ctx.lineTo(10, 20);
+          }
+          ctx.stroke();
+
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.setLineDash([4, 2]);
+          if (st === 0) {
+             ctx.moveTo(-25, 40);
+             ctx.lineTo(0, 40);
+          } else {
+             ctx.moveTo(-15, 40);
+             ctx.lineTo(-10, 40);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          ctx.beginPath();
+          if (st === 0) {
+             ctx.moveTo(-25, 30);
+             ctx.lineTo(-30, 30);
+             ctx.lineTo(-30, 50);
+             ctx.lineTo(-25, 50);
+          } else {
+             ctx.moveTo(-15, 30);
+             ctx.lineTo(-20, 30);
+             ctx.lineTo(-20, 50);
+             ctx.lineTo(-15, 50);
+          }
+          ctx.stroke();
+          
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(t.labels[4] || 'SW', 0, -20);
+        } else {
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-30, 0);
+          ctx.lineTo(-10, 0);
+          ctx.lineTo(-10, -20);
+          ctx.moveTo(30, 0);
+          ctx.lineTo(10, 0);
+          ctx.lineTo(10, -20);
+          ctx.stroke();
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(-13, -23, 6, 6);
+          ctx.fillRect(7, -23, 6, 6);
+          ctx.fillStyle = '#10b981'; // Emerald 500
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'left';
+          ctx.fillText('2', -5, -17);
+          ctx.fillText('4', 15, -17);
+
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.beginPath();
+          if (st === 0) {
+            ctx.moveTo(-10, -20);
+            ctx.lineTo(0, -40);
+            ctx.moveTo(10, -20);
+            ctx.lineTo(0, -40);
+          } else {
+            ctx.moveTo(-10, -20);
+            ctx.lineTo(-10, -40);
+            ctx.moveTo(10, -20);
+            ctx.lineTo(10, -40);
+          }
+          ctx.stroke();
+          
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(t.labels[4] || '4-WAY', 0, 36);
+        }
+      } else if (t.type === 'switch' && t.subtype === 'sel13') {
+        drawPin(0, 10);
+        drawPin(1, 10);
+        drawPin(2, 10);
+
+        // Terminals matching RightSidebar SVG
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(-3, -23, 6, 6); // Top
+        ctx.fillRect(17, -3, 6, 6);  // Right
+        ctx.fillRect(-3, 17, 6, 6);  // Bottom
+
+        // Wires to terminals
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(-24, -24, 48, 48, 6);
-        else ctx.rect(-24, -24, 48, 48);
-        ctx.fill();
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 2;
+        // Top wire
+        ctx.moveTo(0, -30);
+        ctx.lineTo(0, -20);
+        ctx.lineTo(-8, -20);
+        // Right wire
+        ctx.moveTo(30, 0);
+        ctx.lineTo(20, 0);
+        // Bottom wire
+        ctx.moveTo(0, 30);
+        ctx.lineTo(0, 20);
+        ctx.stroke();
+        
+        const st = t.state || 0;
+
+        // Switch Arm
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, 20); // Pivot
+        if (st === 0) {
+          ctx.lineTo(-8, -20); // Connects to top left
+        } else {
+          ctx.lineTo(20, 0); // Connects to right
+        }
         ctx.stroke();
 
+        // Actuator Dashed Line
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, Math.PI * 2);
-        ctx.fillStyle = '#475569';
-        ctx.fill();
-
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 4;
+        ctx.setLineDash([4, 2]);
+        if (st === 0) {
+          ctx.moveTo(-25, 0);
+          ctx.lineTo(-8, 0);
+        } else {
+          ctx.moveTo(-15, 10);
+          ctx.lineTo(10, 10);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Actuator Handle
         ctx.beginPath();
-        ctx.moveTo(0, -10);
-        const st = t.state || 0;
-        if (st === 0) ctx.lineTo(-18, 0);
-        else if (st === 1) ctx.lineTo(0, 18);
-        else ctx.lineTo(18, 0);
+        if (st === 0) {
+          ctx.moveTo(-25, -10);
+          ctx.lineTo(-30, -10);
+          ctx.lineTo(-30, 10);
+          ctx.lineTo(-35, 10);
+        } else {
+          ctx.moveTo(-15, 0);
+          ctx.lineTo(-20, 0);
+          ctx.lineTo(-20, 20);
+          ctx.lineTo(-25, 20);
+        }
         ctx.stroke();
 
         ctx.fillStyle = '#cbd5e1';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(t.labels[4] || 'SW', 0, 36);
-      } else if (t.subtype === 'coil' || t.subtype === 'ton' || t.subtype === 'tof') {
-        const isTimer = t.subtype === 'ton' || t.subtype === 'tof';
+      } else if (t.subtype === 'coil' || t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil' || t.subtype === 'impulse_coil') {
+        const isTimer = t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil';
 
         if (isTimer) {
           drawPin(0, 12);
@@ -1969,12 +2548,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.lineWidth = 2;
           ctx.stroke();
 
-          const title = t.subtype === 'ton' ? 'TON' : 'TOF';
+          let title = 'TON';
+          if (t.subtype === 'tof') title = 'TOF';
+          if (t.subtype === 'flash_coil') title = 'FLS';
           ctx.fillStyle = '#93c5fd';
           ctx.font = 'bold 12px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(title, 0, -14);
+          ctx.fillText(t.labels[4] || title, 0, t.subtype === 'flash_coil' ? -2 : -14);
 
           let displayMs = 0;
           let color = '#64748b';
@@ -2000,6 +2581,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 color = '#64748b';
               }
             }
+          } else if (t.subtype === 'flash_coil') {
+            displayMs = t.value;
+            color = t.isActive ? '#10b981' : '#64748b';
           }
 
           const displayStr = (displayMs / 1000).toFixed(1) + 's';
@@ -2009,14 +2593,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         } else {
           drawPin(0, 16);
           drawPin(2, 16);
-          ctx.fillStyle = '#d97706';
+          ctx.fillStyle = t.subtype === 'impulse_coil' ? '#be123c' : '#d97706';
           ctx.beginPath();
           ctx.arc(0, 0, 18, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 16px Arial';
           ctx.textAlign = 'center';
-          if (!t.labels[4]) ctx.fillText('K', 0, 6);
+          ctx.fillText(t.labels[4] || (t.subtype === 'impulse_coil' ? 'P' : 'K'), 0, 6);
         }
       } else if (t.type === 'load' && t.subtype === 'lightbulb') {
         drawPin(0, 16);
