@@ -79,6 +79,10 @@ export default function App() {
   });
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
 
+  // Mobile Sidebar Toggles
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
   // Save State for Undo
   const saveState = useCallback(() => {
     if (historyStackRef.current.length >= 30) {
@@ -1154,24 +1158,36 @@ export default function App() {
       )}
 
       {/* Top Navbar */}
-      <Navbar currentMode={currentMode} onSwitchMode={handleSwitchMode} />
+      <Navbar 
+        currentMode={currentMode} 
+        onSwitchMode={handleSwitchMode} 
+        onToggleLeftSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+        onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+      />
 
       {/* Main Workspace (Left Sidebar, Canvas, Right Sidebar) */}
-      <div className="flex flex-1 h-[calc(100vh-60px)] overflow-hidden">
-        <LeftSidebar
-          currentMode={currentMode}
-          gridSize={gridSize}
-          zoom={zoom}
-          subMode={subMode}
-          logicLevel={logicLevel}
-          onChangeGridSize={handleChangeGridSize}
-          onChangeZoom={handleChangeZoom}
-          onSetSubMode={setSubMode}
-          onLoadLogicLevel={handleLoadLogicLevel}
-          onExportJSON={handleExportJSON}
-          onImportJSON={handleImportJSON}
-          onExportPNG={handleExportPNG}
-        />
+      <div className="flex flex-col xl:flex-row flex-1 overflow-hidden relative">
+        {/* Left Sidebar Wrapper */}
+        <div className={`absolute inset-y-0 left-0 z-40 transform transition-transform duration-300 xl:relative xl:translate-x-0 ${isLeftSidebarOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl xl:shadow-none`}>
+          <LeftSidebar
+            currentMode={currentMode}
+            gridSize={gridSize}
+            zoom={zoom}
+            subMode={subMode}
+            logicLevel={logicLevel}
+            onChangeGridSize={handleChangeGridSize}
+            onChangeZoom={handleChangeZoom}
+            onSetSubMode={setSubMode}
+            onLoadLogicLevel={handleLoadLogicLevel}
+            onExportJSON={handleExportJSON}
+            onImportJSON={handleImportJSON}
+            onExportPNG={handleExportPNG}
+          />
+        </div>
+        {/* Left Sidebar Backdrop */}
+        {isLeftSidebarOpen && (
+          <div className="fixed inset-0 bg-black/50 z-30 xl:hidden" onClick={() => setIsLeftSidebarOpen(false)} />
+        )}
 
         <CanvasWorkspace
           currentMode={currentMode}
@@ -1203,36 +1219,43 @@ export default function App() {
           onRotatePlacement={handleRotatePlacement}
         />
 
-        <RightSidebar
-          currentMode={currentMode}
-          currentTool={currentTool}
-          meterChannel={meterChannel}
-          oscVal={meterValues.oscVal}
-          vVal={meterValues.vVal}
-          aVal={meterValues.aVal}
-          wVal={meterValues.wVal}
-          multimeterStatusText="請點擊接點測量..."
-          isFaultMode={isFaultMode}
-          hasSelection={hasSelection}
-          isPasting={currentTool === 'paste'}
-          autowireCount={autowireWaypoints.length}
-          placementType={placementType}
-          placementSubtype={placementSubtype}
-          placementRotation={placementRotation}
-          onSetTool={handleSetTool}
-          onSetMeterChannel={setMeterChannel}
-          onSetPlacement={handleSetPlacement}
-          onRotateTool={handleRotateTool}
-          onExecuteAutoWire={handleExecuteAutoWire}
-          onClearAutoWire={() => setAutowireWaypoints([])}
-          onUndo={handleUndo}
-          onOpenClearConfirm={() => setIsConfirmClearOpen(true)}
-          onCutSelection={handleCutSelection}
-          onCopySelection={handleCopySelection}
-          onDeleteSelection={handleDeleteSelection}
-          onToggleFaultMode={handleToggleFaultMode}
-          onClearFaults={handleClearFaults}
-        />
+        {/* Right Sidebar Wrapper */}
+        <div className={`absolute inset-y-0 right-0 z-40 transform transition-transform duration-300 xl:relative xl:translate-x-0 ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'} shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] xl:shadow-none`}>
+          <RightSidebar
+            currentMode={currentMode}
+            currentTool={currentTool}
+            meterChannel={meterChannel}
+            oscVal={meterValues.oscVal}
+            vVal={meterValues.vVal}
+            aVal={meterValues.aVal}
+            wVal={meterValues.wVal}
+            multimeterStatusText="請點擊接點測量..."
+            isFaultMode={isFaultMode}
+            hasSelection={hasSelection}
+            isPasting={currentTool === 'paste'}
+            autowireCount={autowireWaypoints.length}
+            placementType={placementType}
+            placementSubtype={placementSubtype}
+            placementRotation={placementRotation}
+            onSetTool={handleSetTool}
+            onSetMeterChannel={setMeterChannel}
+            onSetPlacement={handleSetPlacement}
+            onRotateTool={handleRotateTool}
+            onExecuteAutoWire={handleExecuteAutoWire}
+            onClearAutoWire={() => setAutowireWaypoints([])}
+            onUndo={handleUndo}
+            onOpenClearConfirm={() => setIsConfirmClearOpen(true)}
+            onCutSelection={handleCutSelection}
+            onCopySelection={handleCopySelection}
+            onDeleteSelection={handleDeleteSelection}
+            onToggleFaultMode={handleToggleFaultMode}
+            onClearFaults={handleClearFaults}
+          />
+        </div>
+        {/* Right Sidebar Backdrop */}
+        {isRightSidebarOpen && (
+          <div className="fixed inset-0 bg-black/50 z-30 xl:hidden" onClick={() => setIsRightSidebarOpen(false)} />
+        )}
       </div>
 
       {/* Property & Confirmation Modals */}

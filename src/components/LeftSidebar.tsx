@@ -51,7 +51,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const fileInsertRef = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="w-[260px] bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
+    <aside className="w-[260px] h-full bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
       {/* Project & Canvas Settings */}
       <div className="p-4 border-b border-slate-800 bg-slate-950/60">
         <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">

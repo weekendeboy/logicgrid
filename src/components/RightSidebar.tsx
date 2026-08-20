@@ -154,7 +154,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   }, [oscVal]);
 
   return (
-    <aside className="w-[300px] bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
+    <aside className="w-[300px] h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
       {/* Meters Panel (Electronic Mode) */}
       {currentMode === 'electronic' && (
         <div className="p-3.5 border-b-2 border-emerald-900/50 bg-slate-950/80">

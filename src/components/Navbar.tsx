@@ -5,33 +5,55 @@
 
 import React from 'react';
 import { AppMode } from '../types';
-import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap } from 'lucide-react';
+import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap, Menu, Wrench } from 'lucide-react';
 
 interface NavbarProps {
   currentMode: AppMode;
   onSwitchMode: (mode: AppMode) => void;
+  onToggleLeftSidebar: () => void;
+  onToggleRightSidebar: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onToggleLeftSidebar, onToggleRightSidebar }) => {
   return (
-    <header className="h-[60px] bg-slate-950 border-b border-slate-800 flex items-center px-5 justify-between shadow-lg z-20 select-none">
-      <div className="flex items-center gap-3">
-        <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-500/20">
-          <Cpu className="text-white w-6 h-6" />
+    <header className="h-auto min-h-[60px] py-2 md:py-0 bg-slate-950 border-b border-slate-800 flex flex-col md:flex-row items-center px-3 md:px-5 justify-between shadow-lg z-20 select-none gap-3 md:gap-0">
+      <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div className="flex items-center gap-3">
+          <button 
+            className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            onClick={onToggleLeftSidebar}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-500/20 shrink-0 hidden sm:block">
+            <Cpu className="text-white w-5 h-5 md:w-6 md:h-6" />
+          </div>
+          <div>
+            <h1 className="text-lg md:text-xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 truncate">
+              Auto Studio Pro (HD)
+            </h1>
+            <p className="text-[10px] text-slate-400 font-medium tracking-wide">
+              三合一工業自動化模擬平台
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400">
-            Auto Studio Pro (HD)
-          </h1>
-          <p className="text-[10px] text-slate-400 font-medium tracking-wide">
-            三合一工業自動化模擬平台
-          </p>
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Engine: Unified</span>
+          </div>
+          <button 
+            className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            onClick={onToggleRightSidebar}
+          >
+            <Wrench className="w-6 h-6" />
+          </button>
         </div>
       </div>
 
-      <div className="flex gap-2 sm:gap-3">
+      <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar snap-x">
         <button
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+          className={`shrink-0 snap-start flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 border ${
             currentMode === 'tutorial'
               ? 'bg-amber-700 text-white border-amber-400 shadow-md shadow-amber-600/30'
               : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
@@ -43,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => 
         </button>
 
         <button
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+          className={`shrink-0 snap-start flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 border ${
             currentMode === 'electronic'
               ? 'bg-blue-700 text-white border-blue-400 shadow-md shadow-blue-600/30'
               : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
@@ -55,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => 
         </button>
 
         <button
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+          className={`shrink-0 snap-start flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 border ${
             currentMode === 'logic'
               ? 'bg-blue-700 text-white border-blue-400 shadow-md shadow-blue-600/30'
               : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
@@ -67,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => 
         </button>
 
         <button
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+          className={`shrink-0 snap-start flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 border ${
             currentMode === 'wiring'
               ? 'bg-blue-700 text-white border-blue-400 shadow-md shadow-blue-600/30'
               : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
@@ -79,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => 
         </button>
 
         <button
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 border ${
+          className={`shrink-0 snap-start flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-all duration-200 border ${
             currentMode === 'plc'
               ? 'bg-yellow-900/60 text-yellow-300 border-yellow-500 shadow-md shadow-yellow-600/20'
               : 'bg-slate-800/80 text-yellow-400 border-yellow-700/60 hover:bg-yellow-950/40'
@@ -89,11 +111,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode }) => 
           <Puzzle className="w-4 h-4 text-yellow-400" />
           <span>4. PLC 梯形圖</span>
         </button>
-      </div>
-
-      <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>Engine: Unified NetEngine</span>
       </div>
     </header>
   );
