@@ -3,7 +3,7 @@
  * RightSidebar Component for Auto Studio Pro
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { AppMode, ToolType, Tile } from '../types';
 import {
   Move,
@@ -22,8 +22,7 @@ import {
   Bug,
   X,
   Link,
-  Info,
-} from 'lucide-react';
+  Info, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface RightSidebarProps {
   currentMode: AppMode;
@@ -56,6 +55,23 @@ interface RightSidebarProps {
   onClearFaults: () => void;
 }
 
+const CollapsibleSection = ({ title, titleNode, children, titleClass }: any) => {
+  const [isOpen, setIsOpen] = React.useState(true);
+  return (
+    <div>
+      <div 
+        className={`${titleClass} flex items-center justify-between cursor-pointer select-none hover:opacity-80 transition-opacity`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-1">{titleNode || title}</div>
+        {isOpen ? <ChevronDown size={14} className="text-slate-500"/> : <ChevronRight size={14} className="text-slate-500"/>}
+      </div>
+      {isOpen && <div>{children}</div>}
+    </div>
+  );
+};
+
+
 export const RightSidebar: React.FC<RightSidebarProps> = ({
   currentMode,
   currentTool,
@@ -86,11 +102,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   onToggleFaultMode,
   onClearFaults,
 }) => {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleExpanded = (key: string) => setExpanded(prev => ({ ...prev, [key]: prev[key] === false ? true : false }));
   const [plcSubTab, setPlcSubTab] = React.useState<'wiring' | 'ladder'>('ladder');
   const oscCanvasRef = useRef<HTMLCanvasElement>(null);
   const oscBufferRef = useRef<number[]>(Array(130).fill(0));
 
-  const isPlacementSelected = (typeStr: string) => currentTool === 'place' && `${placementType}_${placementSubtype}` === typeStr;
+  const isPlacementSelected = (typeStr: string) => {
+    if (currentTool !== 'place') return false;
+    const currentSelected = placementSubtype ? `${placementType}_${placementSubtype}` : placementType;
+    return currentSelected === typeStr;
+  };
 
   // Render dynamic waveform on oscilloscope canvas
   useEffect(() => {
@@ -420,10 +442,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
       {/* Wires & Misc */}
       <div className="p-3.5 border-b border-slate-800">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-          共用導線與註解 (Wires & Misc)
+        <div className="text-xs font-bold text-slate-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('wires')}>
+          <div className="flex items-center gap-1">共用導線與註解 (Wires & Misc)</div>
+          {expanded['wires'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2" style={{ display: expanded['wires'] === false ? 'none' : 'grid' }}>
           <button
             className={`${isPlacementSelected('wire_straight') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2.5  rounded-lg flex justify-center items-center transition-all group`}
             title="直線導線 (右鍵預先旋轉)"
@@ -631,7 +654,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('logic_power') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('logic_power')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="20" width="40" height="40" rx="4" fill="#374151" stroke="#f43f5e" strokeWidth="4" />
                   <circle cx="40" cy="40" r="10" fill="#f43f5e" />
                 </svg>
@@ -641,7 +664,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('logic_pushbtn') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('logic_pushbtn')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="20" width="40" height="40" rx="20" fill="#374151" stroke="#f43f5e" strokeWidth="4" />
                   <circle cx="40" cy="40" r="12" fill="#ef4444" />
                 </svg>
@@ -651,7 +674,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('logic_clock') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('logic_clock')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="20" width="40" height="40" rx="4" fill="#374151" stroke="#0ea5e9" strokeWidth="4" />
                   <path d="M 30 50 L 30 30 L 40 30 L 40 50 L 50 50 L 50 30" stroke="#0ea5e9" strokeWidth="4" fill="none" />
                 </svg>
@@ -669,7 +692,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_and') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_and')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 20 20 L 40 20 A 20 20 0 0 1 40 60 L 20 60 Z" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
                 AND 閘
@@ -678,7 +701,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_or') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_or')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 20 20 Q 40 20 55 40 Q 40 60 20 60 Q 30 40 20 20 Z" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
                 OR 閘
@@ -687,7 +710,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_not') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_not')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <polygon points="20,20 50,40 20,60" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                   <circle cx="55" cy="40" r="5" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
@@ -705,7 +728,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_nand') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_nand')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 15 20 L 35 20 A 20 20 0 0 1 35 60 L 15 60 Z" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                   <circle cx="62" cy="40" r="5" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
@@ -715,7 +738,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_nor') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_nor')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 15 20 Q 35 20 50 40 Q 35 60 15 60 Q 25 40 15 20 Z" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                   <circle cx="58" cy="40" r="5" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
@@ -725,7 +748,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_xor') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_xor')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 15 20 Q 25 40 15 60" fill="none" stroke="#a855f7" strokeWidth="4" />
                   <path d="M 22 20 Q 42 20 57 40 Q 42 60 22 60 Q 32 40 22 20 Z" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
@@ -735,7 +758,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('gate_buffer') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('gate_buffer')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <polygon points="20,20 55,40 20,60" fill="#374151" stroke="#a855f7" strokeWidth="4" />
                 </svg>
                 Buffer 緩衝器
@@ -752,7 +775,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('logic_led') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('logic_led')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="18" fill="#374151" stroke="#fbbf24" strokeWidth="4" />
                 </svg>
                 邏輯燈泡 (1進)
@@ -761,7 +784,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('logic_roman') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
                 onClick={() => onSetPlacement('logic_roman')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="20" width="40" height="40" rx="4" fill="#374151" stroke="#38bdf8" strokeWidth="4" />
                   <text x="40" y="48" fill="#38bdf8" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">I</text>
                 </svg>
@@ -775,15 +798,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       {currentMode === 'wiring' && (
         <div className="p-3.5 space-y-3">
           <div>
-            <div className="text-xs font-bold text-blue-400 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-              <span>⚡ 電源與保護</span>
+            <div className="text-xs font-bold text-blue-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('power')}>
+              <div className="flex items-center gap-1"><span>⚡ 電源與保護</span></div>
+              {expanded['power'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5" style={{ display: expanded['power'] === false ? 'none' : 'grid' }}>
               <button
                 className={`${isPlacementSelected('wire_l') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('wire_l')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="15" fill="none" stroke="#f43f5e" strokeWidth="4" />
                   <text x="40" y="48" fill="#f43f5e" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">L</text>
                 </svg>
@@ -793,7 +817,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('wire_n') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('wire_n')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="15" fill="none" stroke="#3b82f6" strokeWidth="4" />
                   <text x="40" y="48" fill="#3b82f6" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">N</text>
                 </svg>
@@ -803,7 +827,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('wire_plus') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('wire_plus')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="15" fill="none" stroke="#f97316" strokeWidth="4" />
                   <text x="40" y="48" fill="#f97316" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">+</text>
                 </svg>
@@ -813,7 +837,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('wire_minus') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('wire_minus')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="15" fill="none" stroke="#6366f1" strokeWidth="4" />
                   <text x="40" y="48" fill="#6366f1" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">-</text>
                 </svg>
@@ -823,7 +847,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('wire_ground') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('wire_ground')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="36" y="16" width="8" height="8" fill="#94a3b8" />
                   <path d="M 40 24 L 40 50 M 20 50 L 60 50 M 30 60 L 50 60 M 36 70 L 44 70" fill="none" stroke="#94a3b8" strokeWidth="4" />
                 </svg>
@@ -833,7 +857,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('breaker_mcb') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('breaker_mcb')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 40 20 L 40 30 M 40 50 L 40 60 M 30 30 C 45 30 50 50 30 50" fill="none" stroke="#c084fc" strokeWidth="4" />
                   <circle cx="40" cy="20" r="4" fill="#c084fc" />
                   <circle cx="40" cy="60" r="4" fill="#c084fc" />
@@ -844,7 +868,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('power_psu') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('power_psu')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="20" width="40" height="40" fill="none" stroke="#64748b" strokeWidth="3" />
                   <path d="M 20 60 L 60 20" fill="none" stroke="#64748b" strokeWidth="3" />
                   <text x="30" y="35" fill="#94a3b8" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">~</text>
@@ -860,17 +884,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('protection_fuse') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('protection_fuse')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="25" y="30" width="30" height="20" fill="none" stroke="#eab308" strokeWidth="4" />
                   <path d="M 20 40 L 60 40" fill="none" stroke="#eab308" strokeWidth="4" />
                 </svg>
                 保險絲
               </button>
               <button
-                className={`${isPlacementSelected('terminal_block') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} col-span-2 p-2  rounded-lg text-xs text-slate-200 flex items-center justify-center gap-1.5`}
+                className={`${isPlacementSelected('terminal_block') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('terminal_block')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="34" r="16" fill="#64748b" />
                   <path d="M 40 50 L 40 70" fill="none" stroke="#64748b" strokeWidth="4" />
                   <text x="40" y="40" fill="#ffffff" fontSize="14" fontFamily="sans-serif" textAnchor="middle" fontWeight="bold">TB</text>
@@ -881,15 +905,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           </div>
 
           <div>
-            <div className="text-xs font-bold text-emerald-400 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-              <span>🔘 輸入開關</span>
+            <div className="text-xs font-bold text-emerald-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('input')}>
+              <div className="flex items-center gap-1"><span>🔘 輸入開關</span></div>
+              {expanded['input'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5" style={{ display: expanded['input'] === false ? 'none' : 'grid' }}>
               <button
                 className={`${isPlacementSelected('btn_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('btn_no')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -903,7 +928,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('btn_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('btn_nc')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -914,10 +939,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 NC 按鈕
               </button>
               <button
-                className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} col-span-2 p-2  rounded-lg text-xs text-slate-200 flex items-center justify-center gap-1.5`}
+                className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('switch_sel13')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                   <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                   <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -926,13 +951,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <path d="M 15 40 L 32 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                   <path d="M 15 30 L 10 30 L 10 50 L 5 50" fill="none" stroke="#94a3b8" strokeWidth="2" />
                 </svg>
-                選擇開關 (1進2出)
+                選擇開關
               </button>
               <button
-                className={`${isPlacementSelected('switch_4way') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} col-span-2 p-2 rounded-lg text-xs text-slate-200 flex items-center justify-center gap-1.5`}
+                className={`${isPlacementSelected('switch_4way') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('switch_4way')}
               >
-                <svg width="40" height="60" viewBox="0 0 80 120" className="wire-svg shrink-0">
+                <svg width="32" height="48" viewBox="0 0 80 120" className="wire-svg shrink-0">
                   {/* Top Left 1 */}
                   <rect x="17" y="17" width="6" height="6" fill="#94a3b8" />
                   <text x="28" y="24" fill="#10b981" fontSize="16" fontWeight="bold">1</text>
@@ -961,21 +986,94 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <path d="M 40 60 L 15 60" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                   <path d="M 15 50 L 10 50 L 10 70 L 5 70" fill="none" stroke="#94a3b8" strokeWidth="2" />
                 </svg>
-                四路按鈕開關
+                四路按鈕
               </button>
             </div>
           </div>
 
           <div>
-            <div className="text-xs font-bold text-yellow-400 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-              <span>🧲 控制與繼電器</span>
+            <div className="text-xs font-bold text-yellow-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('relay')}>
+              <div className="flex items-center gap-1"><span>🧲 控制與繼電器</span></div>
+              {expanded['relay'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
-<button
+            <div className="grid grid-cols-2 gap-1.5" style={{ display: expanded['relay'] === false ? 'none' : 'grid' }}>
+              <button
+                className={`${isPlacementSelected('relay_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_no')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 30 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                萬用 NO
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_nc')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 40 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                萬用 NC
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_ton_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_ton_no')}>
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 40 45 L 28 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 34 33 L 24 33 M 24 27 A 6 6 0 0 0 24 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                TON-ON
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_ton_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_ton_nc')}>
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 40 45 L 52 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 46 33 L 36 33 M 36 27 A 6 6 0 0 0 36 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                TON-NC
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_tof_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_tof_no')}>
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 40 45 L 28 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 34 33 L 24 33 M 24 27 A 6 6 0 0 1 24 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                TOF-ON
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_tof_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_tof_nc')}>
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 40 45 L 52 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 46 33 L 36 33 M 36 27 A 6 6 0 0 1 36 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                    </svg>
+                TOF-NC
+              </button>
+              <button
                 className={`${isPlacementSelected('relay_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('relay_con')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
   <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
   <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
   <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -988,59 +1086,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 </svg>
                 萬用 CON
               </button>
-                            <button
-                className={`${isPlacementSelected('relay_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_no')}
+              <button
+                className={`${isPlacementSelected('relay_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_coil')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 30 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                萬用 NO
-              </button>
-              <button
-                className={`${isPlacementSelected('relay_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_nc')}
-              >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 40 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                萬用 NC
-              </button>
-
-              <button
-                className={`${isPlacementSelected('relay_ton_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_ton_no')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 40 45 L 28 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                      <path d="M 34 33 L 24 33 M 24 27 A 6 6 0 0 0 24 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                TON-NO
-              </button>
-              <button
-                className={`${isPlacementSelected('relay_ton_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_ton_nc')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 40 45 L 52 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                      <path d="M 46 33 L 36 33 M 36 27 A 6 6 0 0 0 36 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                TON-NC
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <circle cx="40" cy="40" r="16" fill="none" stroke="#f59e0b" strokeWidth="4" />
+                  <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#f59e0b" strokeWidth="4" />
+                </svg>
+                繼電器線圈
               </button>
               <button
                 className={`${isPlacementSelected('relay_ton_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('relay_ton_con')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1051,33 +1110,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 TON-CON
               </button>
               <button
-                className={`${isPlacementSelected('relay_tof_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_tof_no')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 40 45 L 28 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                      <path d="M 34 33 L 24 33 M 24 27 A 6 6 0 0 1 24 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                TOF-NO
-              </button>
-              <button
-                className={`${isPlacementSelected('relay_tof_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_tof_nc')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
-                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
-                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
-                      <path d="M 40 60 L 40 45 L 52 21" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                      <path d="M 46 33 L 36 33 M 36 27 A 6 6 0 0 1 36 39" fill="none" stroke="#cbd5e1" strokeWidth="3" />
-                    </svg>
-                TOF-NC
+                className={`${isPlacementSelected('relay_flash_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_flash_coil')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="24" y="24" width="32" height="32" rx="4" fill="none" stroke="#fde047" strokeWidth="4" />
+                  <path d="M 12 40 L 24 40 M 56 40 L 68 40" fill="none" stroke="#fde047" strokeWidth="4" />
+                  <text x="40" y="45" fill="#fde047" fontSize="16" fontWeight="bold" textAnchor="middle">F</text>
+                </svg>
+                閃爍繼電器
               </button>
               <button
                 className={`${isPlacementSelected('relay_tof_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('relay_tof_con')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1088,50 +1134,30 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 TOF-CON
               </button>
               <button
-                className={`${isPlacementSelected('relay_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_coil')}
-              >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                  <circle cx="40" cy="40" r="16" fill="none" stroke="#f59e0b" strokeWidth="4" />
-                  <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#f59e0b" strokeWidth="4" />
-                </svg>
-                繼電器線圈 (K)
-              </button>
-              <button
-                className={`${isPlacementSelected('relay_flash_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
-                onClick={() => onSetPlacement('relay_flash_coil')}
-              >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
-                  <rect x="24" y="24" width="32" height="32" rx="4" fill="none" stroke="#fde047" strokeWidth="4" />
-                  <path d="M 12 40 L 24 40 M 56 40 L 68 40" fill="none" stroke="#fde047" strokeWidth="4" />
-                  <text x="40" y="45" fill="#fde047" fontSize="16" fontWeight="bold" textAnchor="middle">F</text>
-                </svg>
-                閃爍繼電器
-              </button>
-              <button
                 className={`${isPlacementSelected('relay_impulse_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('relay_impulse_coil')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="16" fill="none" stroke="#be123c" strokeWidth="4" />
                   <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#be123c" strokeWidth="4" />
                   <text x="40" y="45" fill="#be123c" fontSize="16" fontWeight="bold" textAnchor="middle">P</text>
                 </svg>
                 脈衝繼電器
               </button>
-            </div>
+</div>
           </div>
 
           <div>
-            <div className="text-xs font-bold text-amber-500 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-              <span>💡 輸出負載</span>
+            <div className="text-xs font-bold text-amber-500 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('output')}>
+              <div className="flex items-center gap-1"><span>💡 輸出負載</span></div>
+              {expanded['output'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5" style={{ display: expanded['output'] === false ? 'none' : 'grid' }}>
               <button
                 className={`${isPlacementSelected('motor') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('motor')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="16" fill="none" stroke="#fbbf24" strokeWidth="4" />
                   <text x="40" y="48" fill="#fbbf24" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">M</text>
                 </svg>
@@ -1141,7 +1167,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('platform_main') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('platform_main')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="15" y="25" width="50" height="30" fill="none" stroke="#c084fc" strokeWidth="4" />
                   <circle cx="25" cy="40" r="4" fill="#c084fc" />
                   <circle cx="40" cy="40" r="4" fill="#c084fc" />
@@ -1153,7 +1179,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('load_lightbulb') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('load_lightbulb')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <circle cx="40" cy="40" r="16" fill="none" stroke="#facc15" strokeWidth="4" />
                   <path d="M 28 28 L 52 52 M 28 52 L 52 28" fill="none" stroke="#facc15" strokeWidth="4" />
                 </svg>
@@ -1163,7 +1189,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('load_buzzer') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('load_buzzer')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 25 30 L 40 30 L 40 50 L 25 50 Z M 40 30 L 55 15 L 55 65 L 40 50" fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinejoin="round" />
                 </svg>
                 蜂鳴器
@@ -1172,15 +1198,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           </div>
 
           <div>
-            <div className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
-              <span>💨 空壓機電元件</span>
+            <div className="text-xs font-bold text-cyan-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('other')}>
+              <div className="flex items-center gap-1"><span>💨 空壓機電元件</span></div>
+              {expanded['other'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5" style={{ display: expanded['other'] === false ? 'none' : 'grid' }}>
               <button
                 className={`${isPlacementSelected('pneumatic_air_source') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('pneumatic_air_source')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <path d="M 40 25 L 55 50 L 25 50 Z" fill="none" stroke="#22d3ee" strokeWidth="4" />
                   <circle cx="40" cy="38" r="4" fill="#22d3ee" />
                 </svg>
@@ -1190,7 +1217,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('pneumatic_valve_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('pneumatic_valve_coil')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="25" y="25" width="30" height="30" fill="none" stroke="#c084fc" strokeWidth="4" />
                   <path d="M 25 55 L 55 25" fill="none" stroke="#c084fc" strokeWidth="4" />
                 </svg>
@@ -1200,18 +1227,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 className={`${isPlacementSelected('pneumatic_valve_52') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('pneumatic_valve_52')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
                   <rect x="40" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
                   <path d="M 25 45 L 35 35 M 45 45 L 45 35 M 55 45 L 55 35" fill="none" stroke="#22d3ee" strokeWidth="2" />
                 </svg>
-                5/2 閥
+                5/2閥 單線圈
+              </button>
+              <button
+                className={`${isPlacementSelected('pneumatic_valve_52_double') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('pneumatic_valve_52_double')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="20" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
+                  <rect x="40" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
+                  <path d="M 25 35 L 35 45 M 45 45 L 45 35 M 55 45 L 55 35" fill="none" stroke="#22d3ee" strokeWidth="2" />
+                </svg>
+                5/2閥 雙線圈
               </button>
               <button
                 className={`${isPlacementSelected('pneumatic_cylinder') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('pneumatic_cylinder')}
               >
-                <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                   <rect x="20" y="30" width="30" height="20" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                   <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                 </svg>
@@ -1256,13 +1294,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
               {/* PLC Controller & Power */}
               <div>
-                <div className="text-[11px] font-bold text-slate-400 mb-1">主機與電源</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="text-[11px] font-bold text-slate-400 mb-1 flex justify-between items-center cursor-pointer select-none" onClick={() => toggleExpanded('plc_power')}>
+                  <span>主機與電源</span>
+                  {expanded['plc_power'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </div>
+                <div className="grid grid-cols-2 gap-2" style={{ display: expanded['plc_power'] === false ? 'none' : 'grid' }}>
                   <button
                     className={`p-2 bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-700/60 rounded-lg text-xs text-indigo-200 flex items-center gap-1.5 font-bold shadow col-span-2`}
                     onClick={() => onSetPlacement('plc_unit')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="10" y="10" width="60" height="60" rx="4" fill="none" stroke="#6366f1" strokeWidth="4" />
                       <text x="40" y="48" fill="#6366f1" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">PLC</text>
                     </svg>
@@ -1272,7 +1313,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('wire_l') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('wire_l')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="15" fill="none" stroke="#f43f5e" strokeWidth="4" />
                       <text x="40" y="48" fill="#f43f5e" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">L1</text>
                     </svg>
@@ -1282,7 +1323,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('wire_n') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('wire_n')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="15" fill="none" stroke="#3b82f6" strokeWidth="4" />
                       <text x="40" y="48" fill="#3b82f6" fontSize="24" fontFamily="Arial" textAnchor="middle" fontWeight="bold">L2</text>
                     </svg>
@@ -1292,7 +1333,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('power_dc24') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('power_dc24')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="15" fill="none" stroke="#10b981" strokeWidth="4" />
                       <text x="40" y="48" fill="#10b981" fontSize="18" fontFamily="Arial" textAnchor="middle" fontWeight="bold">24V</text>
                     </svg>
@@ -1302,7 +1343,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('power_psu') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('power_psu')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="20" y="20" width="40" height="40" fill="none" stroke="#64748b" strokeWidth="3" />
                       <path d="M 20 60 L 60 20" fill="none" stroke="#64748b" strokeWidth="3" />
                       <text x="30" y="35" fill="#94a3b8" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">~</text>
@@ -1318,7 +1359,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('breaker') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('breaker')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <path d="M 40 20 L 40 30 M 40 50 L 40 60 M 30 30 C 45 30 50 50 30 50" fill="none" stroke="#c084fc" strokeWidth="4" />
                       <circle cx="40" cy="20" r="4" fill="#c084fc" />
                       <circle cx="40" cy="60" r="4" fill="#c084fc" />
@@ -1330,13 +1371,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
               {/* Switches & Buttons */}
               <div>
-                <div className="text-[11px] font-bold text-slate-400 mb-1">開關與按鈕</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="text-[11px] font-bold text-slate-400 mb-1 flex justify-between items-center cursor-pointer select-none" onClick={() => toggleExpanded('plc_input')}>
+                  <span>開關與按鈕</span>
+                  {expanded['plc_input'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </div>
+                <div className="grid grid-cols-2 gap-2" style={{ display: expanded['plc_input'] === false ? 'none' : 'grid' }}>
                   <button
                     className={`${isPlacementSelected('btn_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('btn_no')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1350,7 +1394,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('btn_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('btn_nc')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1361,10 +1405,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     按鈕 (NC)
                   </button>
                   <button
-                    className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5 col-span-2`}
+                    className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('switch_sel13')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1373,13 +1417,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 15 40 L 32 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                       <path d="M 15 30 L 10 30 L 10 50 L 5 50" fill="none" stroke="#94a3b8" strokeWidth="2" />
                     </svg>
-                    選擇開關 (1進2出)
+                    選擇開關
                   </button>
                   <button
-                    className={`${isPlacementSelected('switch_4way') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5 col-span-2`}
+                    className={`${isPlacementSelected('switch_4way') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('switch_4way')}
                   >
-                    <svg width="40" height="60" viewBox="0 0 80 120" className="wire-svg shrink-0">
+                    <svg width="32" height="48" viewBox="0 0 80 120" className="wire-svg shrink-0">
                       <rect x="17" y="17" width="6" height="6" fill="#94a3b8" />
                       <text x="28" y="24" fill="#10b981" fontSize="16" fontWeight="bold">1</text>
                       <path d="M 20 10 L 20 20 L 30 40" fill="none" stroke="#cbd5e1" strokeWidth="3" />
@@ -1402,20 +1446,23 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 40 60 L 15 60" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                       <path d="M 15 50 L 10 50 L 10 70 L 5 70" fill="none" stroke="#94a3b8" strokeWidth="2" />
                     </svg>
-                    四路按鈕開關
+                    四路按鈕
                   </button>
                 </div>
               </div>
 
               {/* Relays & Coils */}
               <div>
-                <div className="text-[11px] font-bold text-slate-400 mb-1">繼電器與控制線圈</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="text-[11px] font-bold text-slate-400 mb-1 flex justify-between items-center cursor-pointer select-none" onClick={() => toggleExpanded('plc_relay')}>
+                  <span>繼電器與控制線圈</span>
+                  {expanded['plc_relay'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </div>
+                <div className="grid grid-cols-2 gap-2" style={{ display: expanded['plc_relay'] === false ? 'none' : 'grid' }}>
                   <button
                     className={`${isPlacementSelected('relay_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="16" fill="none" stroke="#f59e0b" strokeWidth="4" />
                       <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#f59e0b" strokeWidth="4" />
                     </svg>
@@ -1425,7 +1472,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_flash_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_flash_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="24" y="24" width="32" height="32" rx="4" fill="none" stroke="#fde047" strokeWidth="4" />
                       <path d="M 12 40 L 24 40 M 56 40 L 68 40" fill="none" stroke="#fde047" strokeWidth="4" />
                       <text x="40" y="45" fill="#fde047" fontSize="16" fontWeight="bold" textAnchor="middle">F</text>
@@ -1436,7 +1483,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_impulse_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_impulse_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="16" fill="none" stroke="#be123c" strokeWidth="4" />
                       <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#be123c" strokeWidth="4" />
                       <text x="40" y="45" fill="#be123c" fontSize="16" fontWeight="bold" textAnchor="middle">P</text>
@@ -1447,7 +1494,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_flash_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_flash_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="24" y="24" width="32" height="32" rx="4" fill="none" stroke="#fde047" strokeWidth="4" />
                       <path d="M 12 40 L 24 40 M 56 40 L 68 40" fill="none" stroke="#fde047" strokeWidth="4" />
                       <text x="40" y="45" fill="#fde047" fontSize="16" fontWeight="bold" textAnchor="middle">F</text>
@@ -1458,7 +1505,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_impulse_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_impulse_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="16" fill="none" stroke="#be123c" strokeWidth="4" />
                       <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#be123c" strokeWidth="4" />
                       <text x="40" y="45" fill="#be123c" fontSize="16" fontWeight="bold" textAnchor="middle">P</text>
@@ -1469,7 +1516,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('pneumatic_valve_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('pneumatic_valve_coil')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="25" y="25" width="30" height="30" fill="none" stroke="#c084fc" strokeWidth="4" />
                       <path d="M 25 55 L 55 25" fill="none" stroke="#c084fc" strokeWidth="4" />
                     </svg>
@@ -1478,7 +1525,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_ton_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_ton_no')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1490,7 +1537,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_ton_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_ton_nc')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1502,7 +1549,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_ton_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_ton_con')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1515,7 +1562,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_tof_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_tof_no')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1527,7 +1574,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_tof_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_tof_nc')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1539,7 +1586,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     className={`${isPlacementSelected('relay_tof_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_tof_con')}>
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1553,7 +1600,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_con') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_con')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
   <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
   <rect x="57" y="37" width="6" height="6" fill="#94a3b8" />
   <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
@@ -1570,7 +1617,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_no') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_no')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1582,7 +1629,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('relay_nc') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('relay_nc')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
                       <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
                       <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
@@ -1595,13 +1642,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
               {/* Loads & Actuators */}
               <div>
-                <div className="text-[11px] font-bold text-slate-400 mb-1">負載與氣壓</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="text-[11px] font-bold text-slate-400 mb-1 flex justify-between items-center cursor-pointer select-none" onClick={() => toggleExpanded('plc_output')}>
+                  <span>負載與氣壓</span>
+                  {expanded['plc_output'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </div>
+                <div className="grid grid-cols-2 gap-2" style={{ display: expanded['plc_output'] === false ? 'none' : 'grid' }}>
                   <button
                     className={`${isPlacementSelected('load_lightbulb') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('load_lightbulb')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="16" fill="none" stroke="#facc15" strokeWidth="4" />
                       <path d="M 28 28 L 52 52 M 28 52 L 52 28" fill="none" stroke="#facc15" strokeWidth="4" />
                     </svg>
@@ -1611,7 +1661,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('load_buzzer') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('load_buzzer')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <path d="M 25 30 L 40 30 L 40 50 L 25 50 Z M 40 30 L 55 15 L 55 65 L 40 50" fill="none" stroke="#f59e0b" strokeWidth="4" strokeLinejoin="round" />
                     </svg>
                     蜂鳴器
@@ -1620,7 +1670,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('motor') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('motor')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="40" r="16" fill="none" stroke="#fbbf24" strokeWidth="4" />
                       <text x="40" y="48" fill="#fbbf24" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">M</text>
                     </svg>
@@ -1630,7 +1680,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('terminal') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('terminal')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <circle cx="40" cy="34" r="16" fill="#64748b" />
                       <path d="M 40 50 L 40 70" fill="none" stroke="#64748b" strokeWidth="4" />
                       <text x="40" y="40" fill="#ffffff" fontSize="14" fontFamily="sans-serif" textAnchor="middle" fontWeight="bold">TB</text>
@@ -1641,7 +1691,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('pneumatic_air_source') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('pneumatic_air_source')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <path d="M 40 25 L 55 50 L 25 50 Z" fill="none" stroke="#22d3ee" strokeWidth="4" />
                       <circle cx="40" cy="38" r="4" fill="#22d3ee" />
                     </svg>
@@ -1651,18 +1701,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     className={`${isPlacementSelected('pneumatic_valve_52') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('pneumatic_valve_52')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="20" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
                       <rect x="40" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
                       <path d="M 25 45 L 35 35 M 45 45 L 45 35 M 55 45 L 55 35" fill="none" stroke="#22d3ee" strokeWidth="2" />
                     </svg>
-                    5/2電磁閥
+                    5/2閥 單線圈
                   </button>
                   <button
-                    className={`${isPlacementSelected('pneumatic_cylinder') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5 col-span-2`}
+                    className={`${isPlacementSelected('pneumatic_valve_52_double') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                    onClick={() => onSetPlacement('pneumatic_valve_52_double')}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="20" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
+                      <rect x="40" y="30" width="20" height="20" fill="none" stroke="#22d3ee" strokeWidth="3" />
+                      <path d="M 25 35 L 35 45 M 45 45 L 45 35 M 55 45 L 55 35" fill="none" stroke="#22d3ee" strokeWidth="2" />
+                    </svg>
+                    5/2閥 雙線圈
+                  </button>
+                  <button
+                    className={`${isPlacementSelected('pneumatic_cylinder') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                     onClick={() => onSetPlacement('pneumatic_cylinder')}
                   >
-                    <svg width="40" height="40" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
                       <rect x="20" y="30" width="30" height="20" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                       <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                     </svg>
@@ -1675,11 +1736,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
           {plcSubTab === 'ladder' && (
             <div className="space-y-3">
-              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                階梯圖邏輯元件 (Ladder Diagram)
+              <div className="text-xs font-bold text-amber-400 mb-1.5 flex items-center justify-between uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleExpanded('plc_ladder')}>
+                <div className="flex items-center gap-1">階梯圖邏輯元件 (Ladder Diagram)</div>
+                {expanded['plc_ladder'] === false ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               </div>
-
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2" style={{ display: expanded['plc_ladder'] === false ? 'none' : 'grid' }}>
                 <button
                   className={`${isPlacementSelected('plc_no') ? 'bg-amber-600/40 border-amber-400' : 'bg-slate-800 hover:bg-slate-700 border-amber-600/50'} p-2.5  text-white rounded-xl text-xs font-bold shadow flex flex-col items-center justify-center gap-1`}
                   onClick={() => onSetPlacement('plc_no')}

@@ -67,6 +67,10 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
         groups = [[2]];
       } else if (
         t.subtype === 'coil' ||
+        t.subtype === 'ton' ||
+        t.subtype === 'tof' ||
+        t.subtype === 'flash_coil' ||
+        t.subtype === 'impulse_coil' ||
         t.type === 'motor' ||
         t.type === 'load' ||
         t.type === 'power'
@@ -75,8 +79,8 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
       } else if (t.type === 'pneumatic') {
         if (t.subtype === 'air_source') groups = [[2]];
         else if (t.subtype === 'valve_coil') groups = [[0], [2]];
-        else if (t.subtype === 'valve_52') {
-          groups = t.isActive ? [[2, 0]] : [[2, 1]]; // P->A or P->B
+        else if (t.subtype === 'valve_52' || t.subtype === 'valve_52_double') {
+          groups = []; // Handled manually for multi-tile logic
         } else if (t.subtype === 'cyl_top') {
           groups = [[3], [1]]; // 3: Air retract, 1: Sensor Ext OUT
         } else if (t.subtype === 'cyl_mid') {
@@ -135,6 +139,41 @@ export function buildNetState(
           ds.union(first, node);
         }
       });
+
+      // Custom routing for multi-tile valve_52
+      const t = grid[y][x];
+      if (t && (t.subtype === 'valve_52' || t.subtype === 'valve_52_double')) {
+        const rot = t.rotation || 0;
+        const pPort = (2 + rot) % 4;
+        ds.makeSet(`${x},${y},${pPort}`); // P port
+        
+        const ar_dx = [-1, 0, 1, 0][rot];
+        const ar_dy = [0, -1, 0, 1][rot];
+        const bs_dx = [1, 0, -1, 0][rot];
+        const bs_dy = [0, 1, 0, -1][rot];
+
+        const ar_x = x + ar_dx;
+        const ar_y = y + ar_dy;
+        const bs_x = x + bs_dx;
+        const bs_y = y + bs_dy;
+
+        if (!t.isActive && ar_x >= 0 && ar_x < w && ar_y >= 0 && ar_y < h) {
+          const ar_t = grid[ar_y][ar_x];
+          if (ar_t && ar_t.subtype === 'valve_52_a_r') {
+            const aPort = (0 + ar_t.rotation) % 4;
+            ds.makeSet(`${ar_x},${ar_y},${aPort}`); // A port
+            ds.union(`${x},${y},${pPort}`, `${ar_x},${ar_y},${aPort}`);
+          }
+        }
+        if (t.isActive && bs_x >= 0 && bs_x < w && bs_y >= 0 && bs_y < h) {
+          const bs_t = grid[bs_y][bs_x];
+          if (bs_t && bs_t.subtype === 'valve_52_b_s') {
+            const bPort = (0 + bs_t.rotation) % 4;
+            ds.makeSet(`${bs_x},${bs_y},${bPort}`); // B port
+            ds.union(`${x},${y},${pPort}`, `${bs_x},${bs_y},${bPort}`);
+          }
+        }
+      }
     }
   }
 

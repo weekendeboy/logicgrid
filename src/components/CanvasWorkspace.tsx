@@ -493,7 +493,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         (t.type === 'relay' ||
           (t.type === 'misc' && t.subtype === 'blank') ||
           t.type === 'terminal' ||
-          (t.type === 'pneumatic' && (t.subtype === 'valve_coil' || t.subtype === 'valve_52')))
+          (t.type === 'pneumatic' && (t.subtype === 'valve_coil' || t.subtype === 'valve_52' || t.subtype === 'valve_52_double' || t.subtype === 'valve_52_coil' || t.subtype === 'valve_52_coil_left')))
       ) {
         if (t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')) onOpenModal(t, 'timer', mousePos);
         else onOpenModal(t, 'label', mousePos);
@@ -694,6 +694,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           }
         }
         const newT = new Tile(placementType, placementSubtype, (isTimerContact || isFlashCoil) ? 1000 : 0);
+        newT.rotation = placementRotation;
         newT.labels[4] = prefix + (maxNum + 1);
         setGrid((prev) => {
           const next = prev.map((row) => [...row]);
@@ -710,6 +711,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           }
         }
         const newT = new Tile(placementType, placementSubtype);
+        newT.rotation = placementRotation;
         newT.labels[4] = 'TB' + (maxNum + 1);
         setGrid((prev) => {
           const next = prev.map((row) => [...row]);
@@ -718,7 +720,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         });
       } else if (
         placementType === 'pneumatic' &&
-        (placementSubtype === 'valve_coil' || placementSubtype === 'valve_52')
+        placementSubtype === 'valve_coil'
       ) {
         let maxNum = 0;
         for (const r of grid) {
@@ -729,16 +731,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           }
         }
         const newT = new Tile(placementType, placementSubtype, 100);
-        if (placementSubtype === 'valve_coil') {
-          newT.labels[4] = 'V' + (maxNum + 1);
-        } else {
+        newT.rotation = placementRotation;
+        newT.labels[4] = 'V' + (maxNum + 1);
+        setGrid((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[mousePos.y][mousePos.x] = newT;
+          return next;
+        });
+      } else if (
+        placementType === 'pneumatic' &&
+        (placementSubtype === 'valve_52' || placementSubtype === 'valve_52_double')
+      ) {
+        if (
+          mousePos.x - 2 >= 0 &&
+          mousePos.x + 2 < gridSize &&
+          !grid[mousePos.y][mousePos.x - 2] &&
+          !grid[mousePos.y][mousePos.x - 1] &&
+          !grid[mousePos.y][mousePos.x] &&
+          !grid[mousePos.y][mousePos.x + 1] &&
+          !grid[mousePos.y][mousePos.x + 2]
+        ) {
           let maxV = 0;
           for (const r of grid) {
             for (const c of r) {
               if (
                 c &&
                 c.type === 'pneumatic' &&
-                c.subtype === 'valve_coil' &&
+                (c.subtype === 'valve_coil' || c.subtype === 'valve_52' || c.subtype === 'valve_52_coil' || c.subtype === 'valve_52_double') &&
                 c.labels[4] &&
                 c.labels[4].match(/^V\d+$/)
               ) {
@@ -746,13 +765,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               }
             }
           }
-          newT.labels[4] = 'V' + Math.max(1, maxV);
+          const label = 'V' + Math.max(1, maxV);
+          
+          const gid = 'v52_' + Date.now();
+          const t1 = new Tile('pneumatic', placementSubtype === 'valve_52_double' ? 'valve_52_coil_left' : 'valve_52_spring'); t1.groupId = gid;
+          if (placementSubtype === 'valve_52_double') t1.labels[4] = label + 'L';
+          const t2 = new Tile('pneumatic', 'valve_52_a_r'); t2.groupId = gid;
+          const t3 = new Tile('pneumatic', placementSubtype === 'valve_52_double' ? 'valve_52_double' : 'valve_52'); t3.groupId = gid; t3.labels[4] = label;
+          const t4 = new Tile('pneumatic', 'valve_52_b_s'); t4.groupId = gid;
+          const t5 = new Tile('pneumatic', 'valve_52_coil'); t5.groupId = gid; t5.labels[4] = placementSubtype === 'valve_52_double' ? label + 'R' : label;
+
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x - 2] = t1;
+            next[mousePos.y][mousePos.x - 1] = t2;
+            next[mousePos.y][mousePos.x] = t3;
+            next[mousePos.y][mousePos.x + 1] = t4;
+            next[mousePos.y][mousePos.x + 2] = t5;
+            return next;
+          });
         }
-        setGrid((prev) => {
-          const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
-          return next;
-        });
       } else if (placementType === 'power' && placementSubtype === 'psu') {
         if (
           mousePos.x + 1 < gridSize &&
@@ -1122,6 +1154,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                   i === 4 &&
                   (t.type === 'plc' ||
                     t.type === 'terminal' ||
+                    t.type === 'pneumatic' ||
                     t.subtype === 'no' ||
                     t.subtype === 'nc' ||
                     t.subtype === 'pls' ||
@@ -1288,7 +1321,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         else if (currentTool === 'plc_n' || currentTool === 'plc_plf') { pType = 'plc'; pSubtype = 'plf'; }
         else if (currentTool === 'plc_out') { pType = 'plc'; pSubtype = 'out'; }
 
-        if (pType && pSubtype) {
+        if (pType && pSubtype !== undefined) {
           ctx.globalAlpha = 0.5;
 
           const ghostTiles: { x: number; y: number; tile: Tile }[] = [];
@@ -1331,6 +1364,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: bot });
             ghostTiles.push({ x: mousePos.x, y: mousePos.y - 1, tile: mid });
             ghostTiles.push({ x: mousePos.x, y: mousePos.y - 2, tile: top });
+          } else if (pType === 'pneumatic' && pSubtype === 'valve_52') {
+            ghostTiles.push({ x: mousePos.x - 2, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_spring') });
+            ghostTiles.push({ x: mousePos.x - 1, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_a_r') });
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52') });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_b_s') });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_coil') });
+          } else if (pType === 'pneumatic' && pSubtype === 'valve_52_double') {
+            ghostTiles.push({ x: mousePos.x - 2, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_coil_left') });
+            ghostTiles.push({ x: mousePos.x - 1, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_a_r') });
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_double') });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_b_s') });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_coil') });
           } else {
             const ghostTile = new Tile(pType, pSubtype);
             ghostTile.rotation = placementRotation;
@@ -1735,7 +1780,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.font = 'bold 13px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, 0, -5);
+          ctx.save();
+          ctx.translate(0, -6);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText(labelText, 0, 1);
+          ctx.restore();
         }
       }
     } else if (t.type === 'misc' && t.subtype === 'blank') {
@@ -1757,7 +1806,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText('Note', 0, 0);
+        ctx.restore();
       }
     } else if (t.type === 'power') {
       if (t.subtype === 'psu_left' || t.subtype === 'psu_right') {
@@ -1790,16 +1842,43 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           
-          ctx.fillText('L', -10, -10);
-          ctx.fillText('+', -10, 10);
-          
-          ctx.fillText('N', 90, -10);
-          ctx.fillText('-', 90, 10);
-          
+          ctx.save();
+          ctx.translate(-10, -10);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('L', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(-10, 10);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('+', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(90, -10);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('N', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(90, 10);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('-', 0, 0);
+          ctx.restore();
+
           ctx.fillStyle = '#94a3b8';
           ctx.font = 'bold 18px Arial';
-          ctx.fillText('~', 30, -5);
-          ctx.fillText('=', 50, 7);
+          ctx.save();
+          ctx.translate(30, -5);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('~', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(50, 7);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('=', 0, 0);
+          ctx.restore();
         } else {
           // Right tile: only draws the pins and connecting wires
           ctx.beginPath();
@@ -1815,9 +1894,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.fillStyle = '#f97316';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('+24V', 0, -5);
+        ctx.save();
+        ctx.translate(0, -5);
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText('+24V', 0, 0);
+        ctx.restore();
+
         ctx.fillStyle = '#6366f1';
-        ctx.fillText('0V', 0, 10);
+        ctx.save();
+        ctx.translate(0, 10);
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText('0V', 0, 0);
+        ctx.restore();
         ctx.strokeStyle = '#ef4444';
         ctx.beginPath(); ctx.moveTo(-15, -28); ctx.lineTo(-9, -28); ctx.moveTo(-12, -31); ctx.lineTo(-12, -25); ctx.stroke();
         ctx.strokeStyle = '#3b82f6';
@@ -1832,7 +1920,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText('V', 0, 4);
+        ctx.restore();
       }
     } else if (mode === 'logic' || mode === 'tutorial') {
       if (t.subtype === 'power' || t.subtype === 'pushbtn') {
@@ -2097,7 +2188,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText(t.labels[4] || 'TB', 0, 0);
+        ctx.restore();
       } else if (
         t.type === 'btn' ||
         (t.type === 'relay' && (
@@ -2180,7 +2274,29 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#cbd5e1';
           ctx.font = 'bold 12px Arial';
           ctx.textAlign = 'center';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || 'K1', 0, 36);
+          
+          if (isTon || isTof) {
+            let displayMs = t.value || 0;
+            if (t.isPoweredAt !== null) {
+              const elapsed = Date.now() - t.isPoweredAt;
+              displayMs = Math.max(0, displayMs - elapsed);
+            }
+            const sec = (displayMs / 1000).toFixed(1);
+            if (displayMs === 0 && t.isPoweredAt !== null) {
+              ctx.fillStyle = '#10b981';
+            } else if (t.isPoweredAt !== null) {
+              ctx.fillStyle = '#fde047';
+            } else {
+              ctx.fillStyle = '#94a3b8';
+            }
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText(sec + 's', 0, -36);
+          }
+          
+          ctx.restore();
           // Label texts for pins
           ctx.font = '9px Arial';
           ctx.fillStyle = '#94a3b8';
@@ -2276,7 +2392,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
              cy = isActuated ? -6 : 0;
           } else if (isNo) {
              cx = isClosed ? 0 : -5;
-             cy = -5.5; // midpoint of the line from (0,4) to (-10,-15)
+             cy = -5.5; 
           } else if (isNc) {
              cx = isClosed ? 0 : 5;
              cy = -5.5;
@@ -2290,14 +2406,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           // Draw umbrella
           ctx.beginPath();
           if (isTon) {
-             // TON: Bulge on the left (Canvas: from 90deg to 270deg clockwise goes through 180deg)
              ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, false);
           } else if (isTof) {
-             // TOF: Bulge on the right (Canvas: from 90deg to 270deg counter-clockwise goes through 0deg)
              ctx.arc(cx - 10, cy, 6, Math.PI * 0.5, Math.PI * 1.5, true);
           }
           ctx.stroke();
-        } else if (isNc) {
+        } 
+        
+        if (isNc) {
           // NC contact
           ctx.beginPath();
           if (isTon || isTof) {
@@ -2309,6 +2425,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.lineTo(isClosed ? 0 : 10, -12);
           }
           ctx.stroke();
+          
+
+        
 
           if (t.type === 'btn') {
             const eX = isClosed ? -12 : -2;
@@ -2340,7 +2459,29 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.fillStyle = '#cbd5e1';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText(t.labels[4] || (t.type === 'btn' ? 'BTN' : 'RELAY'), 0, 36);
+        
+        if (isTon || isTof) {
+          let displayMs = t.value || 0;
+          if (t.isPoweredAt !== null) {
+            const elapsed = Date.now() - t.isPoweredAt;
+            displayMs = Math.max(0, displayMs - elapsed);
+          }
+          const sec = (displayMs / 1000).toFixed(1);
+          if (displayMs === 0 && t.isPoweredAt !== null) {
+            ctx.fillStyle = '#10b981';
+          } else if (t.isPoweredAt !== null) {
+            ctx.fillStyle = '#fde047';
+          } else {
+            ctx.fillStyle = '#94a3b8';
+          }
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText(sec + 's', 0, -36);
+        }
+        
+        ctx.restore();
 
       } else if (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')) {
         const isActuated = t.isActive || t.isPhysicallyPushed;
@@ -2415,7 +2556,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#cbd5e1';
           ctx.font = 'bold 12px Arial';
           ctx.textAlign = 'center';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || 'SW', 0, -20);
+          ctx.restore();
         } else {
           ctx.strokeStyle = '#64748b';
           ctx.lineWidth = 3;
@@ -2455,7 +2599,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#cbd5e1';
           ctx.font = 'bold 12px Arial';
           ctx.textAlign = 'center';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || '4-WAY', 0, 36);
+          ctx.restore();
         }
       } else if (t.type === 'switch' && t.subtype === 'sel13') {
         drawPin(0, 10);
@@ -2531,7 +2678,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.fillStyle = '#cbd5e1';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText(t.labels[4] || 'SW', 0, 36);
+        ctx.restore();
       } else if (t.subtype === 'coil' || t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil' || t.subtype === 'impulse_coil') {
         const isTimer = t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil';
 
@@ -2555,41 +2705,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.font = 'bold 12px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || title, 0, t.subtype === 'flash_coil' ? -2 : -14);
 
-          let displayMs = 0;
+          let displayMs = t.value || 0;
           let color = '#64748b';
 
-          if (t.subtype === 'ton') {
-            if (t.isPoweredAt === null) {
-              displayMs = t.value;
-              color = '#64748b';
-            } else {
-              displayMs = Math.min(t.value, Date.now() - t.isPoweredAt);
-              if (displayMs < t.value) color = '#fde047';
-              else color = '#10b981';
-            }
-          } else if (t.subtype === 'tof') {
-            if (t.isPoweredAt === null) {
-              displayMs = t.value;
-              color = t.timerOutput ? '#10b981' : '#64748b';
-            } else {
-              displayMs = Math.min(t.value, Date.now() - t.isPoweredAt);
-              if (displayMs < t.value) color = '#fde047';
-              else {
-                displayMs = t.value;
-                color = '#64748b';
-              }
-            }
-          } else if (t.subtype === 'flash_coil') {
+          if (t.subtype === 'flash_coil') {
             displayMs = t.value;
             color = t.isActive ? '#10b981' : '#64748b';
+          } else {
+            if (t.isPoweredAt !== null) {
+              const elapsed = Date.now() - t.isPoweredAt;
+              displayMs = Math.max(0, displayMs - elapsed);
+            }
+            if (displayMs === 0 && t.isPoweredAt !== null) {
+              color = '#10b981';
+            } else if (t.isPoweredAt !== null) {
+              color = '#fde047';
+            }
           }
 
           const displayStr = (displayMs / 1000).toFixed(1) + 's';
           ctx.font = 'bold 12px monospace';
           ctx.fillStyle = color;
           ctx.fillText(displayStr, 0, 15);
+          ctx.restore();
         } else {
           drawPin(0, 16);
           drawPin(2, 16);
@@ -2600,7 +2742,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 16px Arial';
           ctx.textAlign = 'center';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || (t.subtype === 'impulse_coil' ? 'P' : 'K'), 0, 6);
+          ctx.restore();
         }
       } else if (t.type === 'load' && t.subtype === 'lightbulb') {
         drawPin(0, 16);
@@ -2681,7 +2826,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText('M', 0, 1);
+        ctx.restore();
         if (t.isPowered) {
           ctx.shadowColor = '#10b981';
           ctx.shadowBlur = 15;
@@ -2778,45 +2926,177 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 16px Arial';
           ctx.textAlign = 'center';
-          if (!t.labels[4]) ctx.fillText('V', 0, 6);
-        } else if (t.subtype === 'valve_52') {
-          drawPin(2, 16, '#06b6d4');
-          drawPin(0, 16, '#06b6d4');
-          drawPin(1, 16, '#06b6d4');
+          ctx.fillText(t.labels[4] || 'V', 0, 6);
+        } else if (t.subtype === 'valve_52_spring') {
           ctx.fillStyle = '#1e293b';
-          ctx.fillRect(-28, -28, 56, 56);
-          ctx.strokeStyle = '#334155';
+          ctx.fillRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#94a3b8';
           ctx.lineWidth = 2;
-          ctx.strokeRect(-28, -28, 56, 56);
+          ctx.strokeRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.beginPath();
+          ctx.moveTo(40, 0);
+          ctx.lineTo(20, -24);
+          ctx.lineTo(-10, 24);
+          ctx.lineTo(-30, -10);
+          ctx.lineTo(-40, 0);
+          ctx.stroke();
+        } else if (t.subtype === 'valve_52_coil' || t.subtype === 'valve_52_coil_left') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-40, -40, 80, 80);
+          ctx.beginPath();
+          ctx.moveTo(-40, -40);
+          ctx.lineTo(40, 40);
+          ctx.stroke();
+          
+          if (t.labels[4]) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(t.labels[4], 0, -10);
+          }
+        } else if (t.subtype === 'valve_52_a_r') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-40, -40, 80, 80);
+          
+          drawPin(0, 16, '#06b6d4'); // A port
+          
+          // Exhaust text
+          ctx.fillStyle = '#eab308';
+          ctx.font = '16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('A', -20, -20);
+          ctx.fillText('R', -20, 30);
 
-          ctx.fillStyle = '#fff';
-          ctx.font = '10px Arial';
-          ctx.fillText('P', 0, 24);
-          ctx.fillText('A', 0, -18);
-          ctx.fillText('B', 20, 4);
+          const rot = t.rotation || 0;
+          const dx = [1, 0, -1, 0][rot];
+          const dy = [0, 1, 0, -1][rot];
+          const isActive = grid[y + dy]?.[x + dx]?.isActive;
+          const isAirConnected = t.isPowered;
+          const lineColor = isAirConnected ? '#06b6d4' : '#64748b';
 
-          ctx.strokeStyle = '#22d3ee';
-          ctx.lineWidth = 3;
-          if (t.isActive) {
+          if (isActive) {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(0, 12);
-            ctx.lineTo(0, -12);
+            ctx.moveTo(0, -40);
+            ctx.lineTo(0, 20);
             ctx.stroke();
+
+            // R exhausted (triangle pointing downwards)
             ctx.beginPath();
-            ctx.moveTo(-4, -8);
-            ctx.lineTo(0, -12);
-            ctx.lineTo(4, -8);
+            ctx.moveTo(-10, 20);
+            ctx.lineTo(10, 20);
+            ctx.lineTo(0, 40);
+            ctx.closePath();
             ctx.stroke();
           } else {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(0, 12);
+            ctx.moveTo(0, -40);
             ctx.lineTo(0, 0);
-            ctx.lineTo(12, 0);
+            ctx.lineTo(40, 0);
             ctx.stroke();
+
+            // R blocked (T shape)
             ctx.beginPath();
-            ctx.moveTo(8, -4);
-            ctx.lineTo(12, 0);
-            ctx.lineTo(8, 4);
+            ctx.moveTo(-12, 20);
+            ctx.lineTo(12, 20);
+            ctx.moveTo(0, 20);
+            ctx.lineTo(0, 40);
+            ctx.stroke();
+          }
+        } else if (t.subtype === 'valve_52_b_s') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-40, -40, 80, 80);
+
+          drawPin(0, 16, '#06b6d4'); // B port
+          
+          ctx.fillStyle = '#eab308';
+          ctx.font = '16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('B', 20, -20);
+          ctx.fillText('S', 20, 30);
+
+          const rot = t.rotation || 0;
+          const dx = [-1, 0, 1, 0][rot];
+          const dy = [0, -1, 0, 1][rot];
+          const isActive = grid[y + dy]?.[x + dx]?.isActive;
+          const isAirConnected = t.isPowered;
+          const lineColor = isAirConnected ? '#06b6d4' : '#64748b';
+
+          if (isActive) {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, -40);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(-40, 0);
+            ctx.stroke();
+
+            // S blocked (T shape)
+            ctx.beginPath();
+            ctx.moveTo(-12, 20);
+            ctx.lineTo(12, 20);
+            ctx.moveTo(0, 20);
+            ctx.lineTo(0, 40);
+            ctx.stroke();
+          } else {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, -40);
+            ctx.lineTo(0, 20);
+            ctx.stroke();
+
+            // S exhausted (triangle pointing downwards)
+            ctx.beginPath();
+            ctx.moveTo(-10, 20);
+            ctx.lineTo(10, 20);
+            ctx.lineTo(0, 40);
+            ctx.closePath();
+            ctx.stroke();
+          }
+        } else if (t.subtype === 'valve_52' || t.subtype === 'valve_52_double') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-40, -40, 80, 80);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-40, -40, 80, 80);
+          drawPin(2, 16, '#06b6d4'); // P port
+          
+          ctx.fillStyle = '#eab308';
+          ctx.font = '16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('P', -20, 30);
+          const isAirConnected = t.isPowered;
+          const lineColor = isAirConnected ? '#06b6d4' : '#64748b';
+
+          if (t.isActive) {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 40);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(40, 0);
+            ctx.stroke();
+          } else {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 40);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(-40, 0);
             ctx.stroke();
           }
         } else if (t.subtype === 'cyl_mid') {

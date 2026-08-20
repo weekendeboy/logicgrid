@@ -237,7 +237,10 @@ export const WiringEngine = {
                 if (t.isPoweredAt === null) t.isPoweredAt = Date.now();
                 const flashInterval = t.value || 1000;
                 if (Math.floor((Date.now() - t.isPoweredAt) / flashInterval) % 2 === 0) {
-                  if (t.labels[4]) activeContacts.add(t.labels[4]);
+                  if (t.labels[4]) {
+                    activeContacts.add(t.labels[4]);
+                    activeContacts.add(t.labels[4].trim().toUpperCase());
+                  }
                   t.isActive = true;
                 } else {
                   t.isActive = false;
@@ -246,18 +249,30 @@ export const WiringEngine = {
                 if (!t.prevSignal) {
                   t.outState = !t.outState;
                 }
-                if (t.outState && t.labels[4]) activeContacts.add(t.labels[4]);
+                if (t.outState && t.labels[4]) {
+                  activeContacts.add(t.labels[4]);
+                  activeContacts.add(t.labels[4].trim().toUpperCase());
+                }
                 t.isActive = t.outState;
               } else {
-                if (t.labels[4]) activeContacts.add(t.labels[4]);
-                if (t.subtype === 'valve_coil' && t.labels[4]) activeValves.add(t.labels[4]);
+                if (t.labels[4]) {
+                  activeContacts.add(t.labels[4]);
+                  activeContacts.add(t.labels[4].trim().toUpperCase());
+                }
+                if (t.subtype === 'valve_coil' && t.labels[4]) {
+                  activeValves.add(t.labels[4]);
+                  activeValves.add(t.labels[4].trim().toUpperCase());
+                }
                 t.isActive = true;
               }
             } else {
               t.isPoweredAt = null;
               t.isActive = false;
               if (t.subtype === 'impulse_coil') {
-                if (t.outState && t.labels[4]) activeContacts.add(t.labels[4]);
+                if (t.outState && t.labels[4]) {
+                  activeContacts.add(t.labels[4]);
+                  activeContacts.add(t.labels[4].trim().toUpperCase());
+                }
                 t.isActive = t.outState;
               }
             }
@@ -265,11 +280,6 @@ export const WiringEngine = {
           }
         }
 
-        if (t && t.type === 'pneumatic' && t.subtype === 'valve_52') {
-          if (t.labels[4]) {
-            t.isActive = activeValves.has(t.labels[4]);
-          }
-        }
 
         if (t && (t.type === 'load' || t.type === 'motor')) {
           const p0 = netMap[y][x][(0 + t.rotation) % 4];
@@ -454,6 +464,58 @@ export const WiringEngine = {
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[0].length; x++) {
         const t = grid[y][x];
+        if (t && t.type === 'pneumatic' && t.subtype.startsWith('valve_52')) {
+          const rot = t.rotation || 0;
+          if (t.subtype === 'valve_52' || t.subtype === 'valve_52_double') {
+            const pPort = (2 + rot) % 4;
+            t.isPowered = airNets.has(netMap[y][x][pPort]);
+          } else if (t.subtype === 'valve_52_a_r') {
+            const dx = [1, 0, -1, 0][rot];
+            const dy = [0, 1, 0, -1][rot];
+            const pPort = (2 + rot) % 4;
+            t.isPowered = airNets.has(netMap[y + dy]?.[x + dx]?.[pPort] || 0);
+          } else if (t.subtype === 'valve_52_b_s') {
+            const dx = [-1, 0, 1, 0][rot];
+            const dy = [0, -1, 0, 1][rot];
+            const pPort = (2 + rot) % 4;
+            t.isPowered = airNets.has(netMap[y + dy]?.[x + dx]?.[pPort] || 0);
+          }
+          
+          if (t.subtype === 'valve_52_double') {
+            let labelLeft = '';
+            let labelRight = '';
+            if (t.groupId) {
+              for (const row of grid) {
+                for (const c of row) {
+                  if (c && c.groupId === t.groupId) {
+                    if (c.subtype === 'valve_52_coil_left' && c.labels[4]) labelLeft = c.labels[4];
+                    if (c.subtype === 'valve_52_coil' && c.labels[4]) labelRight = c.labels[4];
+                  }
+                }
+              }
+            }
+            if (labelLeft && activeValves.has(labelLeft)) {
+              t.isActive = false;
+            } else if (labelRight && activeValves.has(labelRight)) {
+              t.isActive = true;
+            }
+          } else if (t.labels[4] || (t.subtype !== 'valve_52' && t.subtype !== 'valve_52_coil')) {
+            let label = t.labels[4];
+            if (!label && t.groupId) {
+              for (const row of grid) {
+                for (const c of row) {
+                  if (c && c.groupId === t.groupId && c.labels[4]) {
+                    label = c.labels[4];
+                  }
+                }
+              }
+            }
+            if (label) {
+              const norm = label.trim().toUpperCase();
+              t.isActive = activeValves.has(label) || activeValves.has(norm);
+            }
+          }
+        }
         const isRelayContact = t && t.type === 'relay' && (
           t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
           t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
