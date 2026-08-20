@@ -5,20 +5,22 @@
 
 import React from 'react';
 import { AppMode } from '../types';
-import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap, Menu, Wrench } from 'lucide-react';
+import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap, Menu, Wrench, Sun, Moon } from 'lucide-react';
 
 interface NavbarProps {
   currentMode: AppMode;
   onSwitchMode: (mode: AppMode) => void;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
+  isDarkMode: boolean;
+  onToggleTheme: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onToggleLeftSidebar, onToggleRightSidebar }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onToggleLeftSidebar, onToggleRightSidebar, isDarkMode, onToggleTheme }) => {
   return (
-    <header className="h-auto min-h-[60px] py-2 md:py-0 bg-slate-950 border-b border-slate-800 flex flex-col md:flex-row items-center px-3 md:px-5 justify-between shadow-lg z-20 select-none gap-3 md:gap-0">
-      <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-        <div className="flex items-center gap-3">
+    <header className="w-full max-w-full h-auto min-h-[60px] py-2 md:py-0 bg-slate-950 border-b border-slate-800 flex flex-col md:flex-row items-center px-3 md:px-5 justify-between shadow-lg z-20 select-none gap-3 md:gap-0">
+      <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <button 
             className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
             onClick={onToggleLeftSidebar}
@@ -28,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onTog
           <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-500/20 shrink-0 hidden sm:block">
             <Cpu className="text-white w-5 h-5 md:w-6 md:h-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg md:text-xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 truncate">
               Auto Studio Pro (HD)
             </h1>
@@ -38,6 +40,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onTog
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleTheme}
+            className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            title="切換桌布主題"
+          >
+            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
           <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Engine: Unified</span>

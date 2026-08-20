@@ -25,6 +25,7 @@ interface CanvasWorkspaceProps {
   currentTool: ToolType;
   gridSize: number;
   zoom: number;
+  isDarkMode: boolean;
   grid: (Tile | null)[][];
   setGrid: React.Dispatch<React.SetStateAction<(Tile | null)[][]>>;
   faults: Faults;
@@ -57,6 +58,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   currentTool,
   gridSize,
   zoom,
+  isDarkMode,
   grid,
   setGrid,
   faults,
@@ -1029,7 +1031,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
 
       // Clear Canvas
-      ctx.fillStyle = '#020617';
+      ctx.fillStyle = isDarkMode ? '#020617' : '#f8fafc';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // PLC Mode dual background
@@ -1038,11 +1040,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const splitX = splitCol * TILE_SIZE;
 
         // Ladder on left (0 to splitX)
-        ctx.fillStyle = 'rgba(30, 27, 75, 0.4)';
+        ctx.fillStyle = isDarkMode ? 'rgba(30, 27, 75, 0.4)' : 'rgba(238, 242, 255, 0.6)';
         ctx.fillRect(0, 0, splitX, canvas.height);
 
         // Wiring on right (splitX to width)
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+        ctx.fillStyle = isDarkMode ? 'rgba(15, 23, 42, 0.6)' : 'rgba(241, 245, 249, 0.6)';
         ctx.fillRect(splitX, 0, canvas.width - splitX, canvas.height);
 
         // Power Rail Line for Ladder (Left edge)
@@ -1081,7 +1083,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)';
         ctx.font = 'bold 22px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('🧩 PLC 階梯圖編輯區', splitX / 2, 50);
@@ -1091,7 +1093,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       // Grid Lines
       const gridStep = gridSize <= 10 ? 5 : 10;
       for (let x = 0; x <= gridSize; x++) {
-        ctx.strokeStyle = '#334155';
+        ctx.strokeStyle = isDarkMode ? '#334155' : '#cbd5e1';
         ctx.lineWidth = x % gridStep === 0 ? 2 : 1;
         ctx.setLineDash(x % gridStep === 0 ? [] : [4, 4]);
         ctx.beginPath();
@@ -1099,14 +1101,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.lineTo(x * TILE_SIZE, gridSize * TILE_SIZE);
         ctx.stroke();
         if (x % gridStep === 0 && x > 0 && x < gridSize) {
-          ctx.fillStyle = '#475569';
+          ctx.fillStyle = isDarkMode ? '#475569' : '#94a3b8';
           ctx.font = '12px Arial';
           ctx.textAlign = 'left';
           ctx.fillText(x.toString(), x * TILE_SIZE + 6, 16);
         }
       }
       for (let y = 0; y <= gridSize; y++) {
-        ctx.strokeStyle = '#334155';
+        ctx.strokeStyle = isDarkMode ? '#334155' : '#cbd5e1';
         ctx.lineWidth = y % gridStep === 0 ? 2 : 1;
         ctx.setLineDash(y % gridStep === 0 ? [] : [4, 4]);
         ctx.beginPath();
@@ -1114,7 +1116,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.lineTo(gridSize * TILE_SIZE, y * TILE_SIZE);
         ctx.stroke();
         if (y % gridStep === 0 && y > 0 && y < gridSize) {
-          ctx.fillStyle = '#475569';
+          ctx.fillStyle = isDarkMode ? '#475569' : '#94a3b8';
           ctx.font = '12px Arial';
           ctx.textAlign = 'left';
           ctx.fillText(y.toString(), 6, y * TILE_SIZE + 16);
@@ -1625,6 +1627,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     placementType,
     placementSubtype,
     placementRotation,
+    isDarkMode,
   ]);
 
   // Render individual tile component graphics
@@ -3661,10 +3664,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   }
 
   return (
-    <main className="flex-1 relative overflow-auto bg-slate-950 shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] select-none ">
+    <main className="flex-1 relative overflow-auto bg-slate-950 shadow-[inset_0_0_30px_rgba(0,0,0,0.8)] select-none min-w-0 min-h-0">
       
       {currentMode === 'wiring' && logicLevel === 'wiring-menu' ? (
-        <div className="min-w-full min-h-full w-max h-max p-8 flex flex-col items-center justify-start bg-slate-950 text-slate-100 overflow-y-auto">
+        <div className="w-full h-full p-4 md:p-8 flex flex-col items-center justify-start bg-slate-950 text-slate-100 overflow-y-auto">
           <div className="max-w-5xl w-full flex flex-col gap-10 pb-20 mt-10">
             {[
               {
@@ -3851,6 +3854,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               </div>
             </div>
           )}
+
+          {/* Mobile/Tablet Floating Rotate Button */}
+          <button
+            className="fixed bottom-24 right-4 md:bottom-8 md:right-8 xl:hidden z-50 bg-blue-600/90 hover:bg-blue-500 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.6)] border-2 border-blue-400 active:scale-95 transition-transform backdrop-blur-sm"
+            onClick={(e) => {
+              e.preventDefault();
+              if (currentTool === 'place') {
+                onRotatePlacement();
+              } else {
+                rotateTileGroup(mousePos.x, mousePos.y);
+              }
+            }}
+            title="旋轉元件 (Rotate)"
+          >
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
 
           <canvas
             ref={canvasRef}

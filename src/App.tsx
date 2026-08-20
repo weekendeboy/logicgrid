@@ -24,6 +24,7 @@ import { findAStarPath, layWiresOnPath } from './engine/Pathfinding';
 
 export default function App() {
   const [currentMode, setCurrentMode] = useState<AppMode>('tutorial');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [gridSize, setGridSize] = useState<number>(60);
   const [zoom, setZoom] = useState<number>(1.0);
   const [subMode, setSubMode] = useState<SubMode>('sandbox');
@@ -1149,7 +1150,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex flex-col h-[100dvh] w-full max-w-full bg-slate-950 text-slate-100 overflow-hidden">
       {/* Alert Toast Banner */}
       {alertToast && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-rose-600/95 text-white px-6 py-2.5 rounded-xl font-bold z-[1000] shadow-2xl backdrop-blur-md border border-rose-400 text-sm animate-bounce">
@@ -1163,6 +1164,8 @@ export default function App() {
         onSwitchMode={handleSwitchMode} 
         onToggleLeftSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
         onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
       />
 
       {/* Main Workspace (Left Sidebar, Canvas, Right Sidebar) */}
@@ -1194,6 +1197,7 @@ export default function App() {
           currentTool={currentTool}
           gridSize={gridSize}
           zoom={zoom}
+          isDarkMode={isDarkMode}
           grid={grid}
           setGrid={setGrid}
           faults={faults}

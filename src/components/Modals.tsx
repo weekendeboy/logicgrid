@@ -65,7 +65,7 @@ export const Modals: React.FC<ModalsProps> = ({
       {/* Property Modal */}
       {isOpen && tile && (
         <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[100] backdrop-blur-sm select-none">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-[420px] shadow-2xl">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-[90%] max-w-[420px] shadow-2xl">
             <h3 className="text-lg font-bold mb-4 text-white">
               {mode === 'value' &&
                 (tile.type === 'power' && (tile.subtype === 'ac' || tile.subtype === 'power_ac')
@@ -191,7 +191,7 @@ export const Modals: React.FC<ModalsProps> = ({
       {/* Confirm Clear Canvas Modal */}
       {isConfirmClearOpen && (
         <div className="fixed inset-0 bg-black/80 z-[200] flex justify-center items-center backdrop-blur-sm select-none">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-80 text-center shadow-2xl">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-[90%] max-w-xs text-center shadow-2xl">
             <TriangleAlert className="w-12 h-12 text-rose-500 mx-auto mb-3 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
             <h3 className="text-lg font-bold text-white mb-2">警告：淨空全圖</h3>
             <p className="text-slate-300 text-xs mb-6">
