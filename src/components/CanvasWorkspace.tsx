@@ -235,8 +235,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }, 1200);
   };
 
-  // Canvas Mouse Move
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Canvas Pointer Move
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -297,8 +297,38 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
   };
 
-  // Canvas Mouse Down
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Canvas Pointer Down
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'touch') {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const rawX = (e.clientX - rect.left) * scaleX;
+        const rawY = (e.clientY - rect.top) * scaleY;
+        const mx = Math.floor(rawX / TILE_SIZE);
+        const my = Math.floor(rawY / TILE_SIZE);
+
+        const isPlacementTool = 
+          currentTool === 'place' || 
+          currentTool === 'paste' || 
+          currentTool === 'plc_a' ||
+          currentTool === 'plc_b' ||
+          currentTool === 'plc_p' ||
+          currentTool === 'plc_n' ||
+          currentTool === 'plc_pls' ||
+          currentTool === 'plc_plf' ||
+          currentTool === 'plc_out';
+
+        if (isPlacementTool && (mousePos.x !== mx || mousePos.y !== my)) {
+          setMousePosRaw({ x: rawX, y: rawY });
+          setMousePos({ x: mx, y: my });
+          return;
+        }
+      }
+    }
+
     if (e.button === 2) return; // Right click handles rotation
     if (mousePos.x < 0 || mousePos.x >= gridSize || mousePos.y < 0 || mousePos.y >= gridSize) return;
 
@@ -926,8 +956,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
   };
 
-  // Canvas Mouse Up
-  const handleMouseUp = () => {
+  // Canvas Pointer Up
+  const handlePointerUp = () => {
     if (isSelecting) {
       setIsSelecting(false);
       const b = getSelectionBounds();
@@ -3882,9 +3912,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               height: `${gridSize * TILE_SIZE * zoom}px`,
               cursor: currentTool === 'interact' ? 'default' : 'crosshair',
             }}
-            onMouseMove={handleMouseMove}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
+            onPointerMove={handlePointerMove}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
             onContextMenu={handleContextMenu}
             className="block bg-slate-950 transform-origin-top-left"
           />
