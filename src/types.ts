@@ -103,7 +103,7 @@ export class Tile {
 
     this.isActive = false;
     this.isBlown = false;
-    this.measureVal = 0;
+    this.measureVal = subtype === 'counter_coil' ? (value || 5) : 0;
     this.isPoweredAt = null;
     this.timerOutput = false;
 

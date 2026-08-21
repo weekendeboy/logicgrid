@@ -1142,6 +1142,9 @@ export default function App() {
           target.value = val;
           target.color = color;
           target.labels = { ...labels };
+          if (target.subtype === 'counter_coil') {
+            target.measureVal = val;
+          }
         }
         return next;
       });

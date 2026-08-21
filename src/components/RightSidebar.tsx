@@ -862,7 +862,33 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <circle cx="40" cy="20" r="4" fill="#c084fc" />
                   <circle cx="40" cy="60" r="4" fill="#c084fc" />
                 </svg>
-                MCB斷路器
+                斷路器2P
+              </button>
+              <button
+                className={`${isPlacementSelected('breaker_3p') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('breaker_3p')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <path d="M 40 20 L 40 30 M 40 50 L 40 60 M 30 30 C 45 30 50 50 30 50" fill="none" stroke="#c084fc" strokeWidth="4" />
+                  <circle cx="40" cy="20" r="4" fill="#c084fc" />
+                  <circle cx="40" cy="60" r="4" fill="#c084fc" />
+                </svg>
+                斷路器3P
+              </button>
+              <button
+                className={`${isPlacementSelected('power_3phase') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('power_3phase')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="10" y="25" width="60" height="30" fill="none" stroke="#64748b" strokeWidth="3" />
+                  <text x="25" y="45" fill="#ef4444" fontSize="16" fontFamily="Arial" textAnchor="middle" fontWeight="bold">R</text>
+                  <text x="40" y="45" fill="#f59e0b" fontSize="16" fontFamily="Arial" textAnchor="middle" fontWeight="bold">S</text>
+                  <text x="55" y="45" fill="#3b82f6" fontSize="16" fontFamily="Arial" textAnchor="middle" fontWeight="bold">T</text>
+                  <line x1="25" y1="55" x2="25" y2="70" stroke="#ef4444" strokeWidth="3" />
+                  <line x1="40" y1="55" x2="40" y2="70" stroke="#f59e0b" strokeWidth="3" />
+                  <line x1="55" y1="55" x2="55" y2="70" stroke="#3b82f6" strokeWidth="3" />
+                </svg>
+                三相電源 (R,S,T)
               </button>
               <button
                 className={`${isPlacementSelected('power_psu') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
@@ -1144,6 +1170,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 </svg>
                 脈衝繼電器
               </button>
+              <button
+                className={`${isPlacementSelected('relay_counter_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('relay_counter_coil')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <circle cx="40" cy="40" r="16" fill="none" stroke="#22d3ee" strokeWidth="4" />
+                  <path d="M 20 40 L 24 40 M 56 40 L 60 40 M 40 20 L 40 24" fill="none" stroke="#22d3ee" strokeWidth="4" />
+                  <text x="40" y="45" fill="#22d3ee" fontSize="16" fontWeight="bold" textAnchor="middle">C</text>
+                </svg>
+                計數器繼電器
+              </button>
 </div>
           </div>
 
@@ -1162,6 +1199,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <text x="40" y="48" fill="#fbbf24" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">M</text>
                 </svg>
                 馬達(M)
+              </button>
+              <button
+                className={`${isPlacementSelected('motor_3phase') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('motor_3phase')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <circle cx="40" cy="40" r="16" fill="none" stroke="#ef4444" strokeWidth="4" />
+                  <text x="40" y="48" fill="#ef4444" fontSize="20" fontFamily="Arial" textAnchor="middle" fontWeight="bold">3~</text>
+                </svg>
+                三相馬達(3)
               </button>
               <button
                 className={`${isPlacementSelected('platform_main') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
@@ -1253,7 +1300,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <rect x="20" y="30" width="30" height="20" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                   <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                 </svg>
-                氣壓缸(3)
+                雙動氣壓缸(3)
+              </button>
+              <button
+                className={`${isPlacementSelected('pneumatic_cylinder_single') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('pneumatic_cylinder_single')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="20" y="30" width="30" height="20" fill="none" stroke="#cbd5e1" strokeWidth="4" />
+                  <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
+                  <path d="M 23 35 L 26 45 L 29 35 L 32 45" fill="none" stroke="#cbd5e1" strokeWidth="1" />
+                </svg>
+                單動氣壓缸(3)
               </button>
             </div>
           </div>
@@ -1467,6 +1525,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 20 40 L 24 40 M 56 40 L 60 40" fill="none" stroke="#f59e0b" strokeWidth="4" />
                     </svg>
                     繼電器線圈
+                  </button>
+                  <button
+                    className={`${isPlacementSelected('relay_counter_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                    onClick={() => onSetPlacement('relay_counter_coil')}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <circle cx="40" cy="40" r="16" fill="none" stroke="#22d3ee" strokeWidth="4" />
+                      <path d="M 20 40 L 24 40 M 56 40 L 60 40 M 40 20 L 40 24" fill="none" stroke="#22d3ee" strokeWidth="4" />
+                      <text x="40" y="45" fill="#22d3ee" fontSize="16" fontWeight="bold" textAnchor="middle">C</text>
+                    </svg>
+                    計數器繼電器
                   </button>
                   <button
                     className={`${isPlacementSelected('relay_flash_coil') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
@@ -1728,6 +1797,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
                     </svg>
                     雙動氣壓缸 (3格)
+                  </button>
+                  <button
+                    className={`${isPlacementSelected('pneumatic_cylinder_single') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                    onClick={() => onSetPlacement('pneumatic_cylinder_single')}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="20" y="30" width="30" height="20" fill="none" stroke="#cbd5e1" strokeWidth="4" />
+                      <path d="M 35 30 L 35 50 M 35 40 L 60 40" fill="none" stroke="#cbd5e1" strokeWidth="4" />
+                      <path d="M 23 35 L 26 45 L 29 35 L 32 45" fill="none" stroke="#cbd5e1" strokeWidth="1" />
+                    </svg>
+                    單動氣壓缸 (3格)
                   </button>
                 </div>
               </div>

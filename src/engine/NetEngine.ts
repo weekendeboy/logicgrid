@@ -65,27 +65,36 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
         groups = t.isBlown ? [[0], [2]] : [[0, 2]];
       } else if (t.type === 'terminal') {
         groups = [[2]];
+      } else if (t.type === 'motor') {
+        if (t.subtype === '3phase') {
+          groups = [[0], [2], [3]];
+        } else {
+          groups = [[0], [2]];
+        }
       } else if (
         t.subtype === 'coil' ||
         t.subtype === 'ton' ||
         t.subtype === 'tof' ||
         t.subtype === 'flash_coil' ||
-        t.subtype === 'impulse_coil' ||
-        t.type === 'motor' ||
         t.type === 'load' ||
         t.type === 'power'
       ) {
         groups = [[0], [2]];
+      } else if (t.subtype === 'impulse_coil') {
+        groups = [[0], [2], [3]];
+      } else if (t.subtype === 'counter_coil') {
+        groups = [[1], [3], [0]];
       } else if (t.type === 'pneumatic') {
         if (t.subtype === 'air_source') groups = [[2]];
         else if (t.subtype === 'valve_coil') groups = [[0], [2]];
         else if (t.subtype === 'valve_52' || t.subtype === 'valve_52_double') {
           groups = []; // Handled manually for multi-tile logic
-        } else if (t.subtype === 'cyl_top') {
-          groups = [[3], [1]]; // 3: Air retract, 1: Sensor Ext OUT
-        } else if (t.subtype === 'cyl_mid') {
+        } else if (t.subtype === 'cyl_top' || t.subtype === 'cyl_single_top') {
+          if (t.subtype === 'cyl_single_top') groups = [[1]];
+          else groups = [[3], [1]]; // 3: Air retract, 1: Sensor Ext OUT
+        } else if (t.subtype === 'cyl_mid' || t.subtype === 'cyl_single_mid') {
           groups = [];
-        } else if (t.subtype === 'cyl_bot') {
+        } else if (t.subtype === 'cyl_bot' || t.subtype === 'cyl_single_bot') {
           groups = [[3], [1], [2]]; // 3: Air extend, 1: Sensor Ret OUT, 2: Sensor COM
         }
       } else if (t.type === 'platform') {
@@ -198,9 +207,9 @@ export function buildNetState(
             ds.union(`${x},${y},3`, `${x},${y+1},1`);
             ds.union(`${x},${y},1`, `${x},${y+1},3`);
           } else {
-            // Parallel connection: Top-Left (3) to Bot-Left (3), Top-Right (1) to Bot-Right (1)
-            ds.union(`${x},${y},3`, `${x},${y+1},3`);
-            ds.union(`${x},${y},1`, `${x},${y+1},1`);
+            // Parallel connection: Top-Left (3) to Top-Right (1), Bot-Left (3) to Bot-Right (1)
+            ds.union(`${x},${y},3`, `${x},${y},1`);
+            ds.union(`${x},${y+1},3`, `${x},${y+1},1`);
           }
         }
       }
@@ -251,7 +260,7 @@ export function buildNetState(
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const t = grid[y][x];
-        if (t && t.type === 'pneumatic' && t.subtype === 'cyl_bot') {
+        if (t && t.type === 'pneumatic' && (t.subtype === 'cyl_bot' || t.subtype === 'cyl_single_bot')) {
           const rot = t.rotation || 0;
           const topX = x + [0, 2, 0, -2][rot];
           const topY = y + [-2, 0, 2, 0][rot];

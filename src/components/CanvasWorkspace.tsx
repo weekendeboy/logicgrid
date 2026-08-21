@@ -14,6 +14,7 @@ import {
   Waypoint,
   LogicLevelId,
 } from '../types';
+import { Hand, Move, Square } from 'lucide-react';
 import { buildNetState } from '../engine/NetEngine';
 import { ElectronicEngine } from '../engine/ElectronicEngine';
 import { LogicEngine } from '../engine/LogicEngine';
@@ -122,13 +123,35 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Selection bounds
   const getSelectionBounds = useCallback(() => {
-    return {
-      minX: Math.min(selectStart.x, selectEnd.x),
-      maxX: Math.max(selectStart.x, selectEnd.x),
-      minY: Math.min(selectStart.y, selectEnd.y),
-      maxY: Math.max(selectStart.y, selectEnd.y),
-    };
-  }, [selectStart, selectEnd]);
+    let minX = Math.min(selectStart.x, selectEnd.x);
+    let maxX = Math.max(selectStart.x, selectEnd.x);
+    let minY = Math.min(selectStart.y, selectEnd.y);
+    let maxY = Math.max(selectStart.y, selectEnd.y);
+
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (let y = minY; y <= Math.min(maxY, gridSize - 1); y++) {
+        for (let x = minX; x <= Math.min(maxX, gridSize - 1); x++) {
+          const t = grid[y]?.[x];
+          if (t && t.groupId) {
+            for (let gy = 0; gy < gridSize; gy++) {
+              for (let gx = 0; gx < gridSize; gx++) {
+                if (grid[gy]?.[gx]?.groupId === t.groupId) {
+                  if (gx < minX) { minX = gx; expanded = true; }
+                  if (gx > maxX) { maxX = gx; expanded = true; }
+                  if (gy < minY) { minY = gy; expanded = true; }
+                  if (gy > maxY) { maxY = gy; expanded = true; }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { minX, maxX, minY, maxY };
+  }, [selectStart, selectEnd, grid, gridSize]);
 
   // Check interference for clipboard paste
   const checkInterference = useCallback(() => {
@@ -543,7 +566,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     } else if (currentTool === 'label') {
       if (t) {
-        if (t.subtype.startsWith('ton') || t.subtype.startsWith('tof') || t.subtype === 'flash_coil') onOpenModal(t, 'timer', mousePos);
+        if (t.subtype.startsWith('ton') || t.subtype.startsWith('tof') || t.subtype === 'flash_coil' || t.subtype === 'counter_coil') onOpenModal(t, 'timer', mousePos);
         else onOpenModal(t, 'label', mousePos);
       }
     } else if (currentTool === 'select') {
@@ -616,6 +639,37 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
       onSaveState();
 
+      // [BEGIN] Group removal intercept
+      let gidToRemove: string | null = null;
+      if (grid[mousePos.y][mousePos.x] && grid[mousePos.y][mousePos.x]!.groupId) {
+        gidToRemove = grid[mousePos.y][mousePos.x]!.groupId;
+      }
+      
+      const isCellAvailable = (x: number, y: number) => {
+        if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return false;
+        const t = grid[y][x];
+        return !t || (gidToRemove && t.groupId === gidToRemove) || false;
+      };
+
+      const originalSetGrid = setGrid;
+      const safeSetGrid = (updater: any) => {
+         originalSetGrid((prev) => {
+            let next = prev.map(r => [...r]);
+            if (gidToRemove) {
+               for (let y = 0; y < gridSize; y++) {
+                 for (let x = 0; x < gridSize; x++) {
+                   if (next[y][x] && next[y][x]!.groupId === gidToRemove) next[y][x] = null;
+                 }
+               }
+            }
+            if (typeof updater === 'function') {
+                return updater(next);
+            }
+            return updater;
+         });
+      };
+      // [END] Group removal intercept
+
       if (
         currentTool === 'plc_a' ||
         currentTool === 'plc_b' ||
@@ -638,7 +692,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const newT = new Tile('plc', st);
         newT.labels[4] = ''; // Requirement 7: blank default label
         newT.rotation = 0;
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -654,7 +708,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const newT = new Tile('plc', placementSubtype);
         newT.labels[4] = ''; // Requirement 7: blank default label
         newT.rotation = 0;
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -667,7 +721,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           let empty = true;
           for (let dy = 0; dy < 10; dy++) {
             for (let dx = 0; dx < 4; dx++) {
-              if (grid[mousePos.y + dy][mousePos.x + dx]) {
+              if (!isCellAvailable(mousePos.x + dx, mousePos.y + dy)) {
                 empty = false;
                 break;
               }
@@ -675,7 +729,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           }
           if (empty) {
             const gid = 'plc_' + Date.now();
-            setGrid((prev) => {
+            safeSetGrid((prev) => {
               const next = prev.map((row) => [...row]);
               for (let dy = 0; dy < 10; dy++) {
                 for (let dx = 0; dx < 4; dx++) {
@@ -703,15 +757,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           placementSubtype.startsWith('ton_') ||
           placementSubtype.startsWith('tof_') ||
           placementSubtype === 'flash_coil' ||
-          placementSubtype === 'impulse_coil')
+          placementSubtype === 'impulse_coil' ||
+          placementSubtype === 'counter_coil')
       ) {
         const isTimerContact = placementSubtype.startsWith('ton_') || placementSubtype.startsWith('tof_');
         const isFlashCoil = placementSubtype === 'flash_coil';
         const isImpulseCoil = placementSubtype === 'impulse_coil';
+        const isCounterCoil = placementSubtype === 'counter_coil';
         let prefix = 'K';
         if (isTimerContact) prefix = 'T';
         if (isFlashCoil) prefix = 'F';
         if (isImpulseCoil) prefix = 'P';
+        if (isCounterCoil) prefix = 'C';
         let maxNum = 0;
         for (const r of grid) {
           for (const c of r) {
@@ -725,10 +782,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             }
           }
         }
-        const newT = new Tile(placementType, placementSubtype, (isTimerContact || isFlashCoil) ? 1000 : 0);
+        let initValue = (isTimerContact || isFlashCoil) ? 1000 : 0;
+        if (isCounterCoil) initValue = 5;
+        const newT = new Tile(placementType, placementSubtype, initValue);
         newT.rotation = placementRotation;
         newT.labels[4] = prefix + (maxNum + 1);
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -745,7 +804,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const newT = new Tile(placementType, placementSubtype);
         newT.rotation = placementRotation;
         newT.labels[4] = 'TB' + (maxNum + 1);
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -765,7 +824,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const newT = new Tile(placementType, placementSubtype, 100);
         newT.rotation = placementRotation;
         newT.labels[4] = 'V' + (maxNum + 1);
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -777,11 +836,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         if (
           mousePos.x - 2 >= 0 &&
           mousePos.x + 2 < gridSize &&
-          !grid[mousePos.y][mousePos.x - 2] &&
-          !grid[mousePos.y][mousePos.x - 1] &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y][mousePos.x + 1] &&
-          !grid[mousePos.y][mousePos.x + 2]
+          isCellAvailable(mousePos.x - 2, mousePos.y) &&
+          isCellAvailable(mousePos.x - 1, mousePos.y) &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y) &&
+          isCellAvailable(mousePos.x + 2, mousePos.y)
         ) {
           let maxV = 0;
           for (const r of grid) {
@@ -807,7 +866,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const t4 = new Tile('pneumatic', 'valve_52_b_s'); t4.groupId = gid;
           const t5 = new Tile('pneumatic', 'valve_52_coil'); t5.groupId = gid; t5.labels[4] = placementSubtype === 'valve_52_double' ? label + 'R' : label;
 
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x - 2] = t1;
             next[mousePos.y][mousePos.x - 1] = t2;
@@ -817,18 +876,40 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             return next;
           });
         }
+      } else if (placementType === 'power' && placementSubtype === '3phase') {
+        if (
+          mousePos.x + 2 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y) &&
+          isCellAvailable(mousePos.x + 2, mousePos.y)
+        ) {
+          const gid = '3phase_' + Date.now();
+          const r = new Tile('power', '3phase_r');
+          r.groupId = gid;
+          const s = new Tile('power', '3phase_s');
+          s.groupId = gid;
+          const t = new Tile('power', '3phase_t');
+          t.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = r;
+            next[mousePos.y][mousePos.x + 1] = s;
+            next[mousePos.y][mousePos.x + 2] = t;
+            return next;
+          });
+        }
       } else if (placementType === 'power' && placementSubtype === 'psu') {
         if (
           mousePos.x + 1 < gridSize &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y][mousePos.x + 1]
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y)
         ) {
           const gid = 'psu_' + Date.now();
           const left = new Tile('power', 'psu_left');
           left.groupId = gid;
           const right = new Tile('power', 'psu_right');
           right.groupId = gid;
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x] = left;
             next[mousePos.y][mousePos.x + 1] = right;
@@ -838,15 +919,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'switch' && placementSubtype === '4way') {
         if (
           mousePos.y + 1 < gridSize &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y + 1][mousePos.x]
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x, mousePos.y + 1)
         ) {
           const gid = 'sw4_' + Date.now();
           const top = new Tile('switch', '4way_top');
           top.groupId = gid;
           const bot = new Tile('switch', '4way_bot');
           bot.groupId = gid;
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x] = top;
             next[mousePos.y + 1][mousePos.x] = bot;
@@ -856,15 +937,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'breaker' && placementSubtype === 'mcb') {
         if (
           mousePos.x + 1 < gridSize &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y][mousePos.x + 1]
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y)
         ) {
           const gid = 'brk_' + Date.now();
           const t1 = new Tile('breaker', 'mcb');
           t1.groupId = gid;
           const t2 = new Tile('breaker', 'mcb');
           t2.groupId = gid;
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x] = t1;
             next[mousePos.y][mousePos.x + 1] = t2;
@@ -873,12 +954,36 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         } else {
           onShowAlert('空間不足，斷路器需要橫向連續 2 格空位！');
         }
+      } else if (placementType === 'breaker' && placementSubtype === '3p') {
+        if (
+          mousePos.x + 2 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y) &&
+          isCellAvailable(mousePos.x + 2, mousePos.y)
+        ) {
+          const gid = 'brk_' + Date.now();
+          const t1 = new Tile('breaker', '3p');
+          t1.groupId = gid;
+          const t2 = new Tile('breaker', '3p');
+          t2.groupId = gid;
+          const t3 = new Tile('breaker', '3p');
+          t3.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = t1;
+            next[mousePos.y][mousePos.x + 1] = t2;
+            next[mousePos.y][mousePos.x + 2] = t3;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，斷路器3P需要橫向連續 3 格空位！');
+        }
       } else if (placementType === 'platform' && placementSubtype === 'main') {
         if (
           mousePos.y >= 2 &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y - 1][mousePos.x] &&
-          !grid[mousePos.y - 2][mousePos.x]
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x, mousePos.y - 1) &&
+          isCellAvailable(mousePos.x, mousePos.y - 2)
         ) {
           const gid = 'plat_' + Date.now();
           const bot = new Tile('platform', 'bot');
@@ -888,7 +993,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           mid.groupId = gid;
           const top = new Tile('platform', 'top');
           top.groupId = gid;
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x] = bot;
             next[mousePos.y - 1][mousePos.x] = mid;
@@ -901,9 +1006,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'pneumatic' && placementSubtype === 'cylinder') {
         if (
           mousePos.y >= 2 &&
-          !grid[mousePos.y][mousePos.x] &&
-          !grid[mousePos.y - 1][mousePos.x] &&
-          !grid[mousePos.y - 2][mousePos.x]
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x, mousePos.y - 1) &&
+          isCellAvailable(mousePos.x, mousePos.y - 2)
         ) {
           const gid = 'cyl_' + Date.now();
           const bot = new Tile('pneumatic', 'cyl_bot');
@@ -913,7 +1018,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           mid.groupId = gid;
           const top = new Tile('pneumatic', 'cyl_top');
           top.groupId = gid;
-          setGrid((prev) => {
+          safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
             next[mousePos.y][mousePos.x] = bot;
             next[mousePos.y - 1][mousePos.x] = mid;
@@ -923,6 +1028,31 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         } else {
           onShowAlert('空間不足，氣壓缸需要垂直連續 3 格空位！');
         }
+      } else if (placementType === 'pneumatic' && placementSubtype === 'cylinder_single') {
+        if (
+          mousePos.y >= 2 &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x, mousePos.y - 1) &&
+          isCellAvailable(mousePos.x, mousePos.y - 2)
+        ) {
+          const gid = 'cyl_s_' + Date.now();
+          const bot = new Tile('pneumatic', 'cyl_single_bot');
+          bot.groupId = gid;
+          bot.extension = 0;
+          const mid = new Tile('pneumatic', 'cyl_single_mid');
+          mid.groupId = gid;
+          const top = new Tile('pneumatic', 'cyl_single_top');
+          top.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = bot;
+            next[mousePos.y - 1][mousePos.x] = mid;
+            next[mousePos.y - 2][mousePos.x] = top;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，單動氣壓缸需要垂直連續 3 格空位！');
+        }
       } else {
         let dVal = 100;
         if (placementType === 'power' && (placementSubtype === 'ac' || placementSubtype === 'power_ac'))
@@ -930,8 +1060,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         else if (placementType === 'power') dVal = 12;
         else if (placementType === 'capacitor') dVal = 10000;
         else if (placementType === 'logic' && placementSubtype === 'clock') dVal = 1;
+        else if (placementSubtype === 'counter_coil') dVal = 5;
 
         const newT = new Tile(placementType, placementSubtype, dVal);
+        if (placementSubtype === 'counter_coil') newT.measureVal = dVal;
         newT.rotation = placementRotation;
 
         if (placementType === 'btn' && placementSubtype === 'no') {
@@ -942,7 +1074,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           newT.labels[2] = '12';
         }
 
-        setGrid((prev) => {
+        safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[mousePos.y][mousePos.x] = newT;
           return next;
@@ -1007,7 +1139,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       }
       if (e.key === 'Escape') {
-        if (currentTool === 'paste') onSetTool('interact');
+        onSetTool('interact');
+        if (isSelecting) setIsSelecting(false);
         if (currentTool === 'select') onSelectionChange(null);
         if (currentTool === 'move' && movingTiles) {
           setGrid(prev => {
@@ -1024,7 +1157,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rotateTileGroup, mousePos, currentTool, onUndo, onSetTool, onSelectionChange, onRotatePlacement]);
+  }, [rotateTileGroup, mousePos, currentTool, onUndo, onSetTool, onSelectionChange, onRotatePlacement, movingTiles, isSelecting, setGrid]);
 
   // Main Render Loop
   useEffect(() => {
@@ -1200,6 +1333,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                     t.subtype === 'out' ||
                     t.subtype === 'con' ||
                     t.subtype === 'coil' ||
+                    t.subtype === 'counter_coil' ||
                     t.subtype === 'ton' ||
                     t.subtype === 'tof' ||
                     t.subtype.startsWith('ton_') ||
@@ -1367,6 +1501,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 ghostTiles.push({ x: mousePos.x + dx, y: mousePos.y + dy, tile });
               }
             }
+          } else if (pType === 'power' && pSubtype === '3phase') {
+            const r = new Tile('power', '3phase_r');
+            const s = new Tile('power', '3phase_s');
+            const t = new Tile('power', '3phase_t');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: r });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: s });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: t });
           } else if (pType === 'power' && pSubtype === 'psu') {
             const left = new Tile('power', 'psu_left');
             const right = new Tile('power', 'psu_right');
@@ -1382,6 +1523,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const t2 = new Tile('breaker', 'mcb');
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
             ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+          } else if (pType === 'breaker' && pSubtype === '3p') {
+            const t1 = new Tile('breaker', '3p');
+            const t2 = new Tile('breaker', '3p');
+            const t3 = new Tile('breaker', '3p');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: t3 });
           } else if (pType === 'platform' && pSubtype === 'main') {
             const bot = new Tile('platform', 'bot');
             const mid = new Tile('platform', 'mid');
@@ -1393,6 +1541,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const bot = new Tile('pneumatic', 'cyl_bot');
             const mid = new Tile('pneumatic', 'cyl_mid');
             const top = new Tile('pneumatic', 'cyl_top');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: bot });
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y - 1, tile: mid });
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y - 2, tile: top });
+          } else if (pType === 'pneumatic' && pSubtype === 'cylinder_single') {
+            const bot = new Tile('pneumatic', 'cyl_single_bot');
+            const mid = new Tile('pneumatic', 'cyl_single_mid');
+            const top = new Tile('pneumatic', 'cyl_single_top');
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: bot });
             ghostTiles.push({ x: mousePos.x, y: mousePos.y - 1, tile: mid });
             ghostTiles.push({ x: mousePos.x, y: mousePos.y - 2, tile: top });
@@ -1845,7 +2000,54 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.restore();
       }
     } else if (t.type === 'power') {
-      if (t.subtype === 'psu_left' || t.subtype === 'psu_right') {
+      if (t.subtype === '3phase_r' || t.subtype === '3phase_s' || t.subtype === '3phase_t') {
+        drawPin(2, 10); // Connection pin at bottom
+
+        if (t.subtype === '3phase_r') {
+          // Draw the main unified box
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-20, -20, 200, 40);
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(-20, -20, 200, 40);
+
+          // Lines for connection
+          ctx.beginPath();
+          ctx.moveTo(0, 20); ctx.lineTo(0, 40);
+          ctx.stroke();
+
+          // R label
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 20px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('R', 0, 0);
+          ctx.restore();
+          
+          // S label (drawn by R)
+          ctx.fillStyle = '#f59e0b';
+          ctx.save();
+          ctx.translate(80, 0);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('S', 0, 0);
+          ctx.restore();
+
+          // T label (drawn by R)
+          ctx.fillStyle = '#3b82f6';
+          ctx.save();
+          ctx.translate(160, 0);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('T', 0, 0);
+          ctx.restore();
+        } else {
+          // 3phase_s and 3phase_t only draw their connecting pins
+          ctx.beginPath();
+          ctx.moveTo(0, 20); ctx.lineTo(0, 40);
+          ctx.stroke();
+        }
+      } else if (t.subtype === 'psu_left' || t.subtype === 'psu_right') {
         drawPin(0, 10);
         drawPin(2, 10);
         
@@ -2551,9 +2753,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.moveTo(0, 40);
             ctx.lineTo(-10, 20);
           } else {
-            ctx.moveTo(-10, 40);
-            ctx.lineTo(-10, 20);
-            ctx.moveTo(10, 40);
+            // Straight through! TL to TR!
+            ctx.moveTo(-10, 20);
             ctx.lineTo(10, 20);
           }
           ctx.stroke();
@@ -2566,8 +2767,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
              ctx.moveTo(-25, 40);
              ctx.lineTo(0, 40);
           } else {
-             ctx.moveTo(-15, 40);
-             ctx.lineTo(-10, 40);
+             // Linkage to the horizontal bar
+             ctx.moveTo(-25, 40);
+             ctx.lineTo(0, 40);
+             // Wait, let's just make it point to center
           }
           ctx.stroke();
           ctx.setLineDash([]);
@@ -2622,10 +2825,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.moveTo(10, -20);
             ctx.lineTo(0, -40);
           } else {
+            // Straight through! BL to BR!
             ctx.moveTo(-10, -20);
-            ctx.lineTo(-10, -40);
-            ctx.moveTo(10, -20);
-            ctx.lineTo(10, -40);
+            ctx.lineTo(10, -20);
           }
           ctx.stroke();
           
@@ -2715,7 +2917,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.rotate((-t.rotation * Math.PI) / 2);
         ctx.fillText(t.labels[4] || 'SW', 0, 36);
         ctx.restore();
-      } else if (t.subtype === 'coil' || t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil' || t.subtype === 'impulse_coil') {
+      } else if (t.subtype === 'coil' || t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil' || t.subtype === 'impulse_coil' || t.subtype === 'counter_coil') {
         const isTimer = t.subtype === 'ton' || t.subtype === 'tof' || t.subtype === 'flash_coil';
 
         if (isTimer) {
@@ -2766,18 +2968,50 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillText(displayStr, 0, 15);
           ctx.restore();
         } else {
-          drawPin(0, 16);
-          drawPin(2, 16);
-          ctx.fillStyle = t.subtype === 'impulse_coil' ? '#be123c' : '#d97706';
+          if (t.subtype === 'counter_coil') {
+            drawPin(1, 16);
+            drawPin(3, 16);
+            drawPin(0, 16);
+            
+            ctx.fillStyle = '#be123c';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('R', 0, -18);
+          } else {
+            drawPin(0, 16);
+            drawPin(2, 16);
+          if (t.subtype === 'impulse_coil') {
+            drawPin(3, 16);
+            
+            // Draw an 'R' label near the reset pin
+            ctx.fillStyle = '#be123c';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('R', -20, 0);
+          }
+          }
+          ctx.fillStyle = t.subtype === 'impulse_coil' ? '#be123c' : (t.subtype === 'counter_coil' ? '#0891b2' : '#d97706');
           ctx.beginPath();
           ctx.arc(0, 0, 18, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 16px Arial';
           ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
           ctx.save();
           ctx.rotate((-t.rotation * Math.PI) / 2);
-          ctx.fillText(t.labels[4] || (t.subtype === 'impulse_coil' ? 'P' : 'K'), 0, 6);
+          const defaultLabel = t.subtype === 'impulse_coil' ? 'P' : (t.subtype === 'counter_coil' ? 'C' : 'K');
+          ctx.fillText(t.labels[4] || defaultLabel, 0, t.subtype === 'counter_coil' ? 0 : 6);
+          
+          if (t.subtype === 'counter_coil') {
+            const count = t.measureVal;
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(count.toString(), 0, 28);
+          }
+          
           ctx.restore();
         }
       } else if (t.type === 'load' && t.subtype === 'lightbulb') {
@@ -2826,50 +3060,120 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.translate(Math.random() * 2 - 1, Math.random() * 2 - 1);
         }
       } else if (t.type === 'motor') {
-        drawPin(0, 16);
-        drawPin(2, 16);
-        drawPin(1, 24, '#cbd5e1');
-        ctx.fillStyle = '#1f2937';
-        ctx.beginPath();
-        ctx.arc(0, 0, 24, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.save();
-        if (t.isPowered && t.motorDir !== 0) {
-          t.rotationAngle = (t.rotationAngle || 0) + t.motorDir * 0.25;
-        }
-        ctx.rotate(t.rotationAngle || 0);
-        ctx.fillStyle = t.isPowered ? '#10b981' : '#475569';
-        for (let i = 0; i < 3; i++) {
-          ctx.rotate((Math.PI * 2) / 3);
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.quadraticCurveTo(12, -12, 20, 0);
-          ctx.quadraticCurveTo(12, 12, 0, 0);
-          ctx.fill();
-        }
-        ctx.restore();
-
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.save();
-        ctx.rotate((-t.rotation * Math.PI) / 2);
-        ctx.fillText('M', 0, 1);
-        ctx.restore();
-        if (t.isPowered) {
-          ctx.shadowColor = '#10b981';
-          ctx.shadowBlur = 15;
+        if (t.subtype === '3phase') {
+          drawPin(0, 16);
+          drawPin(2, 16);
+          drawPin(3, 16);
+          drawPin(1, 24, '#cbd5e1');
+          
+          ctx.fillStyle = '#1f2937';
           ctx.beginPath();
           ctx.arc(0, 0, 24, 0, Math.PI * 2);
+          ctx.fill();
           ctx.stroke();
-          ctx.shadowBlur = 0;
+
+          ctx.save();
+          if (t.isPowered && t.motorDir !== 0) {
+            t.rotationAngle = (t.rotationAngle || 0) + t.motorDir * 0.25;
+          }
+          ctx.rotate(t.rotationAngle || 0);
+          ctx.fillStyle = t.isPowered ? '#ef4444' : '#475569';
+          for (let i = 0; i < 3; i++) {
+            ctx.rotate((Math.PI * 2) / 3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(12, -12, 20, 0);
+            ctx.quadraticCurveTo(12, 12, 0, 0);
+            ctx.fill();
+          }
+          ctx.restore();
+
+          // Labels U, V, W
+          ctx.save();
+          ctx.translate(0, -16);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillStyle = '#ef4444'; ctx.font = 'bold 10px Arial'; ctx.fillText('U', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(-16, 0);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillStyle = '#f59e0b'; ctx.font = 'bold 10px Arial'; ctx.fillText('V', 0, 0);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(0, 16);
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 10px Arial'; ctx.fillText('W', 0, 0);
+          ctx.restore();
+
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('3~', 0, 1);
+          ctx.restore();
+
+          if (t.isPowered) {
+            ctx.shadowColor = '#ef4444';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          }
+        } else {
+          drawPin(0, 16);
+          drawPin(2, 16);
+          drawPin(1, 24, '#cbd5e1');
+          ctx.fillStyle = '#1f2937';
+          ctx.beginPath();
+          ctx.arc(0, 0, 24, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+  
+          ctx.save();
+          if (t.isPowered && t.motorDir !== 0) {
+            t.rotationAngle = (t.rotationAngle || 0) + t.motorDir * 0.25;
+          }
+          ctx.rotate(t.rotationAngle || 0);
+          ctx.fillStyle = t.isPowered ? '#10b981' : '#475569';
+          for (let i = 0; i < 3; i++) {
+            ctx.rotate((Math.PI * 2) / 3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(12, -12, 20, 0);
+            ctx.quadraticCurveTo(12, 12, 0, 0);
+            ctx.fill();
+          }
+          ctx.restore();
+  
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('M', 0, 1);
+          ctx.restore();
+          if (t.isPowered) {
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          }
         }
       } else if (t.type === 'platform') {
         ctx.fillStyle = '#1e293b';
@@ -3132,13 +3436,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.lineTo(-40, 0);
             ctx.stroke();
           }
-        } else if (t.subtype === 'cyl_mid') {
+        } else if (t.subtype === 'cyl_mid' || t.subtype === 'cyl_single_mid') {
           ctx.fillStyle = '#334155';
           ctx.fillRect(-30, -40, 60, 80);
           ctx.strokeStyle = '#475569';
           ctx.strokeRect(-30, -40, 60, 80);
-        } else if (t.subtype === 'cyl_top') {
-          drawPin(3, 16, '#06b6d4');
+          
+          if (t.subtype === 'cyl_single_mid') {
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 40);
+            ctx.lineTo(-10, 20);
+            ctx.lineTo(10, -20);
+            ctx.lineTo(0, -40);
+            ctx.stroke();
+          }
+        } else if (t.subtype === 'cyl_top' || t.subtype === 'cyl_single_top') {
+          if (t.subtype === 'cyl_top') {
+            drawPin(3, 16, '#06b6d4');
+          }
           drawPin(1, 16, '#10b981');
 
           const ext = t.extension || 0;
@@ -3157,13 +3474,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillStyle = '#059669';
           ctx.fillRect(30, -20, 6, 40);
 
+          if (t.subtype === 'cyl_single_top') {
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 40);
+            ctx.lineTo(-10, 20);
+            ctx.lineTo(10, -20);
+            ctx.lineTo(0, -40);
+            ctx.stroke();
+          }
+
           if (ext >= 1.9) {
             ctx.fillStyle = '#10b981';
             ctx.beginPath();
             ctx.arc(33, 0, 4, 0, Math.PI * 2);
             ctx.fill();
           }
-        } else if (t.subtype === 'cyl_bot') {
+        } else if (t.subtype === 'cyl_bot' || t.subtype === 'cyl_single_bot') {
           drawPin(3, 16, '#06b6d4');
           drawPin(1, 16, '#10b981');
           drawPin(2, 16, '#ef4444');
@@ -3884,6 +4212,43 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               </div>
             </div>
           )}
+
+          {/* Mobile Tool Switcher */}
+          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 xl:hidden z-50 flex items-center gap-2 bg-slate-900/95 backdrop-blur-md p-2 rounded-full border border-slate-700 shadow-2xl">
+            <button
+              className={`p-3 rounded-full flex items-center justify-center transition-all ${
+                currentTool === 'interact'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              onClick={() => onSetTool('interact')}
+              title="互動 (Interact)"
+            >
+              <Hand size={24} />
+            </button>
+            <button
+              className={`p-3 rounded-full flex items-center justify-center transition-all ${
+                currentTool === 'move'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              onClick={() => onSetTool('move')}
+              title="平移 (Move)"
+            >
+              <Move size={24} />
+            </button>
+            <button
+              className={`p-3 rounded-full flex items-center justify-center transition-all ${
+                currentTool === 'select'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              onClick={() => onSetTool('select')}
+              title="框選 (Select)"
+            >
+              <Square size={24} />
+            </button>
+          </div>
 
           {/* Mobile/Tablet Floating Rotate Button */}
           <button

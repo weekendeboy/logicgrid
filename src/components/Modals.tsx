@@ -90,7 +90,7 @@ export const Modals: React.FC<ModalsProps> = ({
                     : tile.type === 'logic' && tile.subtype === 'clock'
                     ? '頻率 (Hz) [建議 0.5 ~ 10 之間]：'
                     : mode === 'timer'
-                    ? '延遲時間 (毫秒 ms)：'
+                    ? (tile.subtype === 'counter_coil' ? '設定計數次數：' : '延遲時間 (毫秒 ms)：')
                     : '設定數值：'}
                 </p>
                 <input

@@ -42,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onTog
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleTheme}
-            className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            className="flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
             title="切換桌布主題"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
