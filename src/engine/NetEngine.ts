@@ -20,10 +20,22 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
     else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g' || t.subtype === 'plus' || t.subtype === 'minus' || t.subtype === 'ground') groups = [[2]];
   } else {
     if (mode === 'electronic') {
-      if (t.type === 'power' || t.type === 'resistor' || t.type === 'led' || t.type === 'capacitor') {
+      if (t.type === 'power' || t.type === 'resistor' || t.type === 'led' || t.type === 'capacitor' || t.type === 'load') {
         groups = [[0], [2]];
       } else if (t.type === 'meter') {
         groups = [[0], [1], [2], [3]];
+      } else if (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_')))) {
+        if (t.subtype === 'var_left') {
+          groups = [[0, 2, 3]];
+        } else if (t.subtype === 'var_right') {
+          groups = [[0, 1, 2]];
+        } else if (t.subtype === 'var_mid') {
+          groups = [[0, 2]];
+        } else {
+          groups = [[0], [1], [2]];
+        }
+      } else if (t.type === 'switch' && t.subtype === 'spst') {
+        groups = act ? [[0, 2]] : [[0], [2]];
       }
     } else if (mode === 'logic' || mode === 'tutorial') {
       if (t.subtype === 'power' || t.subtype === 'pushbtn' || t.subtype === 'clock') {

@@ -16,6 +16,9 @@ import {
   ShieldAlert,
   HelpCircle,
   Puzzle,
+  Pin,
+  PinOff,
+  X,
 } from 'lucide-react';
 
 interface LeftSidebarProps {
@@ -24,6 +27,9 @@ interface LeftSidebarProps {
   zoom: number;
   subMode: SubMode;
   logicLevel: LogicLevelId;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onClose?: () => void;
   onChangeGridSize: (size: number) => void;
   onChangeZoom: (zoom: number) => void;
   onSetSubMode: (mode: SubMode) => void;
@@ -39,6 +45,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   zoom,
   subMode,
   logicLevel,
+  isPinned,
+  onTogglePin,
+  onClose,
   onChangeGridSize,
   onChangeZoom,
   onSetSubMode,
@@ -51,7 +60,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const fileInsertRef = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="w-[260px] h-full bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
+    <aside className="w-[260px] h-full bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0 shadow-lg">
+      {/* Sidebar Control Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950 border-b border-slate-800 text-xs select-none">
+        <div className="flex items-center gap-1.5 font-bold text-indigo-400">
+          <Settings className="w-4 h-4" />
+          <span>專案與設定</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {onTogglePin && (
+            <button
+              onClick={onTogglePin}
+              title={isPinned ? "已鎖定操作欄（點擊解除鎖定，動作後自動縮回）" : "未鎖定（點擊鎖定操作欄，動作後不縮回）"}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 shadow-sm border ${
+                isPinned
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 ring-1 ring-amber-500/30'
+                  : 'bg-slate-800/90 text-slate-400 hover:text-slate-200 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              {isPinned ? <Pin className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> : <PinOff className="w-3.5 h-3.5" />}
+              <span>{isPinned ? '已鎖定' : '鎖定'}</span>
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="收合操作欄"
+              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
       {/* Project & Canvas Settings */}
       <div className="p-4 border-b border-slate-800 bg-slate-950/60">
         <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">

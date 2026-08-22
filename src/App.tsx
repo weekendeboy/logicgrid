@@ -80,9 +80,46 @@ export default function App() {
   });
   const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
 
-  // Mobile Sidebar Toggles
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  // Mobile & Desktop Sidebar Toggles & Pin State
+  const [isLeftPinned, setIsLeftPinned] = useState<boolean>(() => {
+    const saved = localStorage.getItem('autostudio_left_pinned');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isRightPinned, setIsRightPinned] = useState<boolean>(() => {
+    const saved = localStorage.getItem('autostudio_right_pinned');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+
+  const handleToggleLeftPin = useCallback(() => {
+    setIsLeftPinned((prev) => {
+      const next = !prev;
+      localStorage.setItem('autostudio_left_pinned', String(next));
+      if (next) {
+        setIsLeftSidebarOpen(true);
+        showAlert('📌 左側操作欄已鎖定（操作後保持展開）');
+      } else {
+        showAlert('🔓 左側操作欄已解除鎖定（完成操作後將自動縮回）');
+      }
+      return next;
+    });
+  }, [showAlert]);
+
+  const handleToggleRightPin = useCallback(() => {
+    setIsRightPinned((prev) => {
+      const next = !prev;
+      localStorage.setItem('autostudio_right_pinned', String(next));
+      if (next) {
+        setIsRightSidebarOpen(true);
+        showAlert('📌 右側操作欄已鎖定（操作後保持展開）');
+      } else {
+        showAlert('🔓 右側操作欄已解除鎖定（完成操作後將自動縮回）');
+      }
+      return next;
+    });
+  }, [showAlert]);
 
   // Save State for Undo
   const saveState = useCallback(() => {
@@ -802,6 +839,9 @@ export default function App() {
   // Change Grid Size
   const handleChangeGridSize = (newSize: number) => {
     setGridSize(newSize);
+    if (!isLeftPinned) {
+      setIsLeftSidebarOpen(false);
+    }
     setGrid((prev) => {
       const next = Array(newSize)
         .fill(null)
@@ -849,12 +889,18 @@ export default function App() {
   // Change Zoom
   const handleChangeZoom = (newZoom: number) => {
     setZoom(newZoom);
+    if (!isLeftPinned) {
+      setIsLeftSidebarOpen(false);
+    }
     showAlert(`畫面已縮放至 ${Math.round(newZoom * 100)}%`);
   };
 
   // Load Logic Level
   const handleLoadLogicLevel = (levelId: LogicLevelId) => {
     setLogicLevel(levelId);
+    if (!isLeftPinned && levelId !== 'tutorial-menu' && levelId !== 'wiring-menu') {
+      setIsLeftSidebarOpen(false);
+    }
     if (levelId === 'tutorial-menu' || levelId === 'wiring-menu') {
       return; // Do nothing else, just show the menu
     }
@@ -877,6 +923,9 @@ export default function App() {
     setCurrentTool(tool);
     if (tool !== 'select') setSelectionBounds(null);
     if (tool !== 'autowire') setAutowireWaypoints([]);
+    if (!isRightPinned && tool !== 'autowire') {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   // Set Placement
@@ -896,6 +945,10 @@ export default function App() {
       }
     } else {
       setPlacementRotation(0);
+    }
+
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
     }
   };
 
@@ -949,6 +1002,9 @@ export default function App() {
       });
     }
     setAutowireWaypoints([]);
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   // Toggle Fault Mode
@@ -964,6 +1020,9 @@ export default function App() {
       }
       return next;
     });
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   // Clear Faults
@@ -971,6 +1030,9 @@ export default function App() {
     saveState();
     setFaults({ opens: [], shorts: [] });
     showAlert('已清除所有故障與測量記錄');
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   // Selection Actions
@@ -979,6 +1041,9 @@ export default function App() {
     handleCopySelection(false);
     handleDeleteSelection(true);
     handleSetTool('paste');
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   const handleCopySelection = (changeTool: boolean = true) => {
@@ -996,6 +1061,9 @@ export default function App() {
     }
     setClipboard({ w: maxX - minX + 1, h: maxY - minY + 1, data: cbData });
     if (changeTool) handleSetTool('paste');
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   const handleDeleteSelection = (keepSelection: boolean = false) => {
@@ -1008,6 +1076,9 @@ export default function App() {
       )
     );
     if (!keepSelection) setSelectionBounds(null);
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
   };
 
   // JSON Export / Import
@@ -1026,6 +1097,9 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
     showAlert('專案檔儲存成功！');
+    if (!isLeftPinned) {
+      setIsLeftSidebarOpen(false);
+    }
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>, isInsert: boolean) => {
@@ -1100,6 +1174,9 @@ export default function App() {
       e.target.value = '';
     };
     reader.readAsText(file);
+    if (!isLeftPinned) {
+      setIsLeftSidebarOpen(false);
+    }
   };
 
   // Export Screenshot
@@ -1111,6 +1188,9 @@ export default function App() {
     a.href = canvas.toDataURL('image/png');
     a.click();
     showAlert('高畫質 PNG 輸出成功！');
+    if (!isLeftPinned) {
+      setIsLeftSidebarOpen(false);
+    }
   };
 
   // Modal Open & Save
@@ -1145,6 +1225,18 @@ export default function App() {
           if (target.subtype === 'counter_coil') {
             target.measureVal = val;
           }
+          if (target.groupId) {
+            for (let r = 0; r < next.length; r++) {
+              for (let c = 0; c < next[r].length; c++) {
+                const item = next[r][c];
+                if (item && item.groupId === target.groupId) {
+                  item.value = val;
+                  item.color = color;
+                  item.labels = { ...labels };
+                }
+              }
+            }
+          }
         }
         return next;
       });
@@ -1165,34 +1257,56 @@ export default function App() {
       <Navbar 
         currentMode={currentMode} 
         onSwitchMode={handleSwitchMode} 
-        onToggleLeftSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-        onToggleRightSidebar={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+        onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
+        onToggleRightSidebar={() => setIsRightSidebarOpen((prev) => !prev)}
+        isLeftSidebarOpen={isLeftSidebarOpen}
+        isRightSidebarOpen={isRightSidebarOpen}
+        isLeftPinned={isLeftPinned}
+        isRightPinned={isRightPinned}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
       />
 
       {/* Main Workspace (Left Sidebar, Canvas, Right Sidebar) */}
-      <div className="flex flex-col xl:flex-row flex-1 overflow-hidden relative">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
         {/* Left Sidebar Wrapper */}
-        <div className={`absolute inset-y-0 left-0 z-40 transform transition-transform duration-300 xl:relative xl:translate-x-0 ${isLeftSidebarOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl xl:shadow-none`}>
-          <LeftSidebar
-            currentMode={currentMode}
-            gridSize={gridSize}
-            zoom={zoom}
-            subMode={subMode}
-            logicLevel={logicLevel}
-            onChangeGridSize={handleChangeGridSize}
-            onChangeZoom={handleChangeZoom}
-            onSetSubMode={setSubMode}
-            onLoadLogicLevel={handleLoadLogicLevel}
-            onExportJSON={handleExportJSON}
-            onImportJSON={handleImportJSON}
-            onExportPNG={handleExportPNG}
-          />
+        <div
+          className={`${
+            isLeftPinned
+              ? isLeftSidebarOpen
+                ? 'relative z-20 flex-shrink-0'
+                : 'hidden'
+              : `absolute inset-y-0 left-0 z-40 transform transition-transform duration-300 ${
+                  isLeftSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                } shadow-2xl`
+          }`}
+        >
+          {isLeftSidebarOpen && (
+            <LeftSidebar
+              currentMode={currentMode}
+              gridSize={gridSize}
+              zoom={zoom}
+              subMode={subMode}
+              logicLevel={logicLevel}
+              isPinned={isLeftPinned}
+              onTogglePin={handleToggleLeftPin}
+              onClose={() => setIsLeftSidebarOpen(false)}
+              onChangeGridSize={handleChangeGridSize}
+              onChangeZoom={handleChangeZoom}
+              onSetSubMode={setSubMode}
+              onLoadLogicLevel={handleLoadLogicLevel}
+              onExportJSON={handleExportJSON}
+              onImportJSON={handleImportJSON}
+              onExportPNG={handleExportPNG}
+            />
+          )}
         </div>
-        {/* Left Sidebar Backdrop */}
-        {isLeftSidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-30 xl:hidden" onClick={() => setIsLeftSidebarOpen(false)} />
+        {/* Left Sidebar Backdrop (only when unpinned and open) */}
+        {!isLeftPinned && isLeftSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-30 transition-opacity"
+            onClick={() => setIsLeftSidebarOpen(false)}
+          />
         )}
 
         <CanvasWorkspace
@@ -1227,41 +1341,59 @@ export default function App() {
         />
 
         {/* Right Sidebar Wrapper */}
-        <div className={`absolute inset-y-0 right-0 z-40 transform transition-transform duration-300 xl:relative xl:translate-x-0 ${isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'} shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)] xl:shadow-none`}>
-          <RightSidebar
-            currentMode={currentMode}
-            currentTool={currentTool}
-            meterChannel={meterChannel}
-            oscVal={meterValues.oscVal}
-            vVal={meterValues.vVal}
-            aVal={meterValues.aVal}
-            wVal={meterValues.wVal}
-            multimeterStatusText="請點擊接點測量..."
-            isFaultMode={isFaultMode}
-            hasSelection={hasSelection}
-            isPasting={currentTool === 'paste'}
-            autowireCount={autowireWaypoints.length}
-            placementType={placementType}
-            placementSubtype={placementSubtype}
-            placementRotation={placementRotation}
-            onSetTool={handleSetTool}
-            onSetMeterChannel={setMeterChannel}
-            onSetPlacement={handleSetPlacement}
-            onRotateTool={handleRotateTool}
-            onExecuteAutoWire={handleExecuteAutoWire}
-            onClearAutoWire={() => setAutowireWaypoints([])}
-            onUndo={handleUndo}
-            onOpenClearConfirm={() => setIsConfirmClearOpen(true)}
-            onCutSelection={handleCutSelection}
-            onCopySelection={handleCopySelection}
-            onDeleteSelection={handleDeleteSelection}
-            onToggleFaultMode={handleToggleFaultMode}
-            onClearFaults={handleClearFaults}
-          />
+        <div
+          className={`${
+            isRightPinned
+              ? isRightSidebarOpen
+                ? 'relative z-20 flex-shrink-0'
+                : 'hidden'
+              : `absolute inset-y-0 right-0 z-40 transform transition-transform duration-300 ${
+                  isRightSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+                } shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.5)]`
+          }`}
+        >
+          {isRightSidebarOpen && (
+            <RightSidebar
+              currentMode={currentMode}
+              currentTool={currentTool}
+              meterChannel={meterChannel}
+              oscVal={meterValues.oscVal}
+              vVal={meterValues.vVal}
+              aVal={meterValues.aVal}
+              wVal={meterValues.wVal}
+              multimeterStatusText="請點擊接點測量..."
+              isFaultMode={isFaultMode}
+              hasSelection={hasSelection}
+              isPasting={currentTool === 'paste'}
+              autowireCount={autowireWaypoints.length}
+              placementType={placementType}
+              placementSubtype={placementSubtype}
+              placementRotation={placementRotation}
+              isPinned={isRightPinned}
+              onTogglePin={handleToggleRightPin}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onSetTool={handleSetTool}
+              onSetMeterChannel={setMeterChannel}
+              onSetPlacement={handleSetPlacement}
+              onRotateTool={handleRotateTool}
+              onExecuteAutoWire={handleExecuteAutoWire}
+              onClearAutoWire={() => setAutowireWaypoints([])}
+              onUndo={handleUndo}
+              onOpenClearConfirm={() => setIsConfirmClearOpen(true)}
+              onCutSelection={handleCutSelection}
+              onCopySelection={handleCopySelection}
+              onDeleteSelection={handleDeleteSelection}
+              onToggleFaultMode={handleToggleFaultMode}
+              onClearFaults={handleClearFaults}
+            />
+          )}
         </div>
-        {/* Right Sidebar Backdrop */}
-        {isRightSidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-30 xl:hidden" onClick={() => setIsRightSidebarOpen(false)} />
+        {/* Right Sidebar Backdrop (only when unpinned and open) */}
+        {!isRightPinned && isRightSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-[1px] z-30 transition-opacity"
+            onClick={() => setIsRightSidebarOpen(false)}
+          />
         )}
       </div>
 

@@ -96,6 +96,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   ]);
   const [shortSelectionNode, setShortSelectionNode] = useState<string | null>(null);
   const [movingTiles, setMovingTiles] = useState<{ dx: number; dy: number; ox: number; oy: number; tile: Tile }[] | null>(null);
+  const [dragResistorGroupId, setDragResistorGroupId] = useState<string | null>(null);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectStart, setSelectStart] = useState({ x: 0, y: 0 });
@@ -258,6 +259,77 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }, 1200);
   };
 
+  // Helper to adjust variable resistor slider position
+  const updateSlidePotentiometer = useCallback(
+    (rawX: number, rawY: number, targetTile: Tile, mx: number, my: number) => {
+      const tilesInGroup: { x: number; y: number; tile: Tile }[] = [];
+      if (targetTile.groupId) {
+        for (let y = 0; y < gridSize; y++) {
+          for (let x = 0; x < gridSize; x++) {
+            const c = grid[y][x];
+            if (c && c.groupId === targetTile.groupId) {
+              tilesInGroup.push({ x, y, tile: c });
+            }
+          }
+        }
+      } else {
+        tilesInGroup.push({ x: mx, y: my, tile: targetTile });
+      }
+
+      if (tilesInGroup.length === 0) return;
+
+      const rot = targetTile.rotation || 0;
+      const isHoriz = rot % 2 === 0;
+
+      let ratio = 0.5;
+      if (isHoriz) {
+        const xs = tilesInGroup.map((t) => t.x);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const trackLeft = minX * TILE_SIZE + 20;
+        const trackRight = maxX * TILE_SIZE + 60;
+        const trackWidth = Math.max(1, trackRight - trackLeft);
+
+        if (rot === 0) {
+          ratio = (rawX - trackLeft) / trackWidth;
+        } else {
+          ratio = (trackRight - rawX) / trackWidth;
+        }
+      } else {
+        const ys = tilesInGroup.map((t) => t.y);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const trackTop = minY * TILE_SIZE + 20;
+        const trackBottom = maxY * TILE_SIZE + 60;
+        const trackHeight = Math.max(1, trackBottom - trackTop);
+
+        if (rot === 1) {
+          ratio = (rawY - trackTop) / trackHeight;
+        } else {
+          ratio = (trackBottom - rawY) / trackHeight;
+        }
+      }
+
+      const clampedRatio = Math.max(0, Math.min(1, Math.round(ratio * 100) / 100));
+
+      setGrid((prev) =>
+        prev.map((row, ry) =>
+          row.map((c, rx) => {
+            if (!c) return c;
+            if (targetTile.groupId && c.groupId === targetTile.groupId) {
+              return Object.assign(new Tile(), c, { extension: clampedRatio });
+            }
+            if (!targetTile.groupId && rx === mx && ry === my) {
+              return Object.assign(new Tile(), c, { extension: clampedRatio });
+            }
+            return c;
+          })
+        )
+      );
+    },
+    [grid, gridSize, setGrid]
+  );
+
   // Canvas Pointer Move
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -294,28 +366,52 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
     setHoverNode(foundHover);
 
-    // Drag-holding interactive buttons
+    // Drag-holding interactive buttons & sliding potentiometer
     if (currentTool === 'interact' && e.buttons === 1) {
-      const t = grid[my]?.[mx];
-      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
-        setGrid((prev) => {
-          const curr = prev[my][mx];
-          if (!curr) return prev;
-          return prev.map((row) =>
-            row.map((c) => {
-              if (c === curr) return Object.assign(new Tile(), c, { isActive: true });
-              if (c && curr.groupId && c.groupId === curr.groupId) return Object.assign(new Tile(), c, { isActive: true });
-              if (
-                c && curr.labels && curr.labels[4] &&
-                c.labels && c.labels[4] === curr.labels[4] &&
-                (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
-              ) {
-                return Object.assign(new Tile(), c, { isActive: true });
-              }
-              return c;
-            })
-          );
-        });
+      if (dragResistorGroupId) {
+        let foundTile: Tile | null = null;
+        let foundX = 0;
+        let foundY = 0;
+        for (let y = 0; y < gridSize; y++) {
+          for (let x = 0; x < gridSize; x++) {
+            const c = grid[y][x];
+            if (c && (c.groupId === dragResistorGroupId || `r_${x}_${y}` === dragResistorGroupId)) {
+              foundTile = c;
+              foundX = x;
+              foundY = y;
+              break;
+            }
+          }
+          if (foundTile) break;
+        }
+        if (foundTile) {
+          updateSlidePotentiometer(rawX, rawY, foundTile, foundX, foundY);
+        }
+      } else {
+        const t = grid[my]?.[mx];
+        if (t && (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_'))))) {
+          updateSlidePotentiometer(rawX, rawY, t, mx, my);
+          setDragResistorGroupId(t.groupId || `r_${mx}_${my}`);
+        } else if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
+          setGrid((prev) => {
+            const curr = prev[my][mx];
+            if (!curr) return prev;
+            return prev.map((row) =>
+              row.map((c) => {
+                if (c === curr) return Object.assign(new Tile(), c, { isActive: true });
+                if (c && curr.groupId && c.groupId === curr.groupId) return Object.assign(new Tile(), c, { isActive: true });
+                if (
+                  c && curr.labels && curr.labels[4] &&
+                  c.labels && c.labels[4] === curr.labels[4] &&
+                  (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
+                ) {
+                  return Object.assign(new Tile(), c, { isActive: true });
+                }
+                return c;
+              })
+            );
+          });
+        }
       }
     }
   };
@@ -517,6 +613,32 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             }
             return next;
           });
+        } else if (t.subtype === 'spst') {
+          const ns = !t.isActive;
+          setGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            if (next[mousePos.y][mousePos.x]) {
+              next[mousePos.y][mousePos.x] = Object.assign(new Tile(), next[mousePos.y][mousePos.x], { isActive: ns });
+            }
+            return next;
+          });
+        }
+      } else if (t && (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_'))))) {
+        if (e.shiftKey) {
+          onOpenModal(t, 'value', mousePos);
+        } else {
+          const canvas = canvasRef.current;
+          let rawX = mousePosRaw.x;
+          let rawY = mousePosRaw.y;
+          if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            rawX = (e.clientX - rect.left) * scaleX;
+            rawY = (e.clientY - rect.top) * scaleY;
+          }
+          updateSlidePotentiometer(rawX, rawY, t, mousePos.x, mousePos.y);
+          setDragResistorGroupId(t.groupId || `r_${mousePos.x}_${mousePos.y}`);
         }
       } else if (t && t.type === 'logic' && t.subtype === 'power') {
         const ns = !t.isActive;
@@ -1053,6 +1175,67 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         } else {
           onShowAlert('空間不足，單動氣壓缸需要垂直連續 3 格空位！');
         }
+      } else if (
+        placementType === 'resistor_var' ||
+        (placementType === 'resistor' && (placementSubtype === 'var' || placementSubtype === 'resistor_var'))
+      ) {
+        const rot = placementRotation;
+        const isHoriz = rot % 2 === 0;
+        const canPlace = isHoriz
+          ? mousePos.x + 2 < gridSize &&
+            isCellAvailable(mousePos.x, mousePos.y) &&
+            isCellAvailable(mousePos.x + 1, mousePos.y) &&
+            isCellAvailable(mousePos.x + 2, mousePos.y)
+          : mousePos.y + 2 < gridSize &&
+            isCellAvailable(mousePos.x, mousePos.y) &&
+            isCellAvailable(mousePos.x, mousePos.y + 1) &&
+            isCellAvailable(mousePos.x, mousePos.y + 2);
+
+        if (canPlace) {
+          const gid = 'rvar_' + Date.now();
+          const tLeft = new Tile('resistor_var', 'var_left', 100);
+          tLeft.groupId = gid;
+          tLeft.rotation = rot;
+          tLeft.extension = 0.5;
+
+          const tMid = new Tile('resistor_var', 'var_mid', 100);
+          tMid.groupId = gid;
+          tMid.rotation = rot;
+          tMid.extension = 0.5;
+
+          const tRight = new Tile('resistor_var', 'var_right', 100);
+          tRight.groupId = gid;
+          tRight.rotation = rot;
+          tRight.extension = 0.5;
+
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            if (isHoriz) {
+              if (rot === 0) {
+                next[mousePos.y][mousePos.x] = tLeft;
+                next[mousePos.y][mousePos.x + 1] = tMid;
+                next[mousePos.y][mousePos.x + 2] = tRight;
+              } else {
+                next[mousePos.y][mousePos.x] = tRight;
+                next[mousePos.y][mousePos.x + 1] = tMid;
+                next[mousePos.y][mousePos.x + 2] = tLeft;
+              }
+            } else {
+              if (rot === 1) {
+                next[mousePos.y][mousePos.x] = tLeft;
+                next[mousePos.y + 1][mousePos.x] = tMid;
+                next[mousePos.y + 2][mousePos.x] = tRight;
+              } else {
+                next[mousePos.y][mousePos.x] = tRight;
+                next[mousePos.y + 1][mousePos.x] = tMid;
+                next[mousePos.y + 2][mousePos.x] = tLeft;
+              }
+            }
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，滑動變阻器需要連續 3 格空位！');
+        }
       } else {
         let dVal = 100;
         if (placementType === 'power' && (placementSubtype === 'ac' || placementSubtype === 'power_ac'))
@@ -1101,6 +1284,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onSelectionChange(b);
       }
     }
+    setDragResistorGroupId(null);
     // Release active pushbuttons
     setGrid((prev) =>
       prev.map((row) =>
@@ -1563,6 +1747,43 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_double') });
             ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_b_s') });
             ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: new Tile('pneumatic', 'valve_52_coil') });
+          } else if (
+            pType === 'resistor_var' ||
+            (pType === 'resistor' && (pSubtype === 'var' || pSubtype === 'resistor_var'))
+          ) {
+            const rot = placementRotation;
+            const isHoriz = rot % 2 === 0;
+            const tLeft = new Tile('resistor_var', 'var_left', 100);
+            tLeft.rotation = rot;
+            tLeft.extension = 0.5;
+            const tMid = new Tile('resistor_var', 'var_mid', 100);
+            tMid.rotation = rot;
+            tMid.extension = 0.5;
+            const tRight = new Tile('resistor_var', 'var_right', 100);
+            tRight.rotation = rot;
+            tRight.extension = 0.5;
+
+            if (isHoriz) {
+              if (rot === 0) {
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: tLeft });
+                ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: tMid });
+                ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: tRight });
+              } else {
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: tRight });
+                ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: tMid });
+                ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: tLeft });
+              }
+            } else {
+              if (rot === 1) {
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: tLeft });
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y + 1, tile: tMid });
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y + 2, tile: tRight });
+              } else {
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: tRight });
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y + 1, tile: tMid });
+                ghostTiles.push({ x: mousePos.x, y: mousePos.y + 2, tile: tLeft });
+              }
+            }
           } else {
             const ghostTile = new Tile(pType, pSubtype);
             ghostTile.rotation = placementRotation;
@@ -2145,6 +2366,60 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.beginPath(); ctx.moveTo(-15, -28); ctx.lineTo(-9, -28); ctx.moveTo(-12, -31); ctx.lineTo(-12, -25); ctx.stroke();
         ctx.strokeStyle = '#3b82f6';
         ctx.beginPath(); ctx.moveTo(-15, 28); ctx.lineTo(-9, 28); ctx.stroke();
+      } else if (t.subtype === '12v' || t.subtype === '1_5v' || t.subtype === 'power_12v' || t.subtype === 'power_1_5v') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -10);
+        ctx.moveTo(0, 30); ctx.lineTo(0, 10);
+        ctx.stroke();
+        
+        ctx.strokeStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.moveTo(-20, -10); ctx.lineTo(20, -10);
+        ctx.stroke();
+        
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(-10, 10); ctx.lineTo(10, 10);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        const vText = (t.subtype === '1_5v' || t.subtype === 'power_1_5v') ? '1.5V' : '12V';
+        ctx.fillText(vText, 0, 36);
+        ctx.restore();
+      } else if (t.subtype === 'ac' || t.subtype === 'power_ac') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -20);
+        ctx.moveTo(0, 30); ctx.lineTo(0, 20);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.stroke();
+        
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText('~', 0, 2);
+        ctx.restore();
       } else {
         // generic power
         drawPin(0, 20);
@@ -2339,7 +2614,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.fillText(label, -4, 4);
         }
       }
-    } else if (mode === 'wiring' || mode === 'plc') {
+    } else if (mode === 'wiring' || mode === 'plc' || mode === 'electronic') {
       if (t.type === 'breaker') {
         drawPin(0, 16);
         drawPin(2, 16);
@@ -2837,6 +3112,548 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.save();
           ctx.rotate((-t.rotation * Math.PI) / 2);
           ctx.fillText(t.labels[4] || '4-WAY', 0, 36);
+          ctx.restore();
+        }
+      } else if (t.type === 'resistor' && t.subtype !== 'var' && !t.subtype.startsWith('var_') && t.subtype !== 'resistor_var') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30);
+        ctx.lineTo(0, -20);
+        ctx.moveTo(0, 30);
+        ctx.lineTo(0, 20);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(6, -15);
+        ctx.lineTo(-6, -5);
+        ctx.lineTo(6, 5);
+        ctx.lineTo(-6, 15);
+        ctx.lineTo(0, 20);
+        ctx.stroke();
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText((t.value || 1000) + 'Ω', 0, 36);
+        ctx.restore();
+      } else if (t.type === 'capacitor') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -5);
+        ctx.moveTo(0, 30); ctx.lineTo(0, 5);
+        ctx.stroke();
+        
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-15, -5); ctx.lineTo(15, -5);
+        ctx.moveTo(-15, 5); ctx.lineTo(15, 5);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText((t.value || 10000) + 'μF', 0, 36);
+        ctx.restore();
+      } else if (t.type === 'led') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -15);
+        ctx.moveTo(0, 30); ctx.lineTo(0, 15);
+        ctx.stroke();
+        
+        // Triangle
+        ctx.fillStyle = t.isBlown ? '#374151' : ((t.currentA && t.currentA > 0.001) ? '#ef4444' : '#7f1d1d');
+        if (t.currentA && t.currentA > 0.001 && !t.isBlown) {
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 15;
+        }
+        ctx.beginPath();
+        ctx.moveTo(-15, -15);
+        ctx.lineTo(15, -15);
+        ctx.lineTo(0, 15);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Line
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-15, 15); ctx.lineTo(15, 15);
+        ctx.stroke();
+        
+        if (t.isBlown) {
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('BLOWN', 0, 0);
+        }
+      } else if (t.type === 'meter') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30); ctx.lineTo(0, -20);
+        ctx.moveTo(0, 30); ctx.lineTo(0, 20);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        let label = t.subtype.toUpperCase();
+        if (t.subtype === 'osc') label = 'OSC';
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      } else if (t.type === 'switch' && t.subtype === 'spst') {
+        drawPin(0, 10);
+        drawPin(2, 10);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -30);
+        ctx.lineTo(0, -10);
+        ctx.moveTo(0, 30);
+        ctx.lineTo(0, 10);
+        ctx.stroke();
+
+        ctx.strokeStyle = t.isActive ? '#10b981' : '#ef4444';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        if (t.isActive) {
+          ctx.lineTo(0, 10);
+        } else {
+          ctx.lineTo(12, 5);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText(t.labels[4] || 'SPST', 0, 36);
+        ctx.restore();
+      } else if (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_') || t.subtype === 'resistor_var'))) {
+        const totalR = t.value || 100;
+        const ratio = Math.max(0, Math.min(1, t.extension !== undefined ? t.extension : 0.5));
+
+        if (t.subtype === 'var_left') {
+          // Terminal A connections
+          drawPin(3, 10); // Pin 3 (Left end)
+          drawPin(2, 10); // Pin 2 (Bottom)
+          drawPin(0, 10); // Pin 0 (Top support)
+
+          // Pin traces to terminal & support
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          // Left pin 3 -> terminal
+          ctx.moveTo(-40, 0); ctx.lineTo(-24, 0);
+          // Bottom pin 2 -> terminal
+          ctx.moveTo(0, 40); ctx.lineTo(0, 24); ctx.lineTo(-20, 14);
+          // Top pin 0 -> support rod
+          ctx.moveTo(0, -40); ctx.lineTo(0, -22); ctx.lineTo(-20, -22);
+          ctx.stroke();
+
+          // Base mounting bracket / Stand (Left)
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(-28, -26, 10, 52, 3);
+          else ctx.rect(-28, -26, 10, 52);
+          ctx.fill();
+          ctx.stroke();
+
+          // Screws on bracket
+          ctx.fillStyle = '#94a3b8';
+          ctx.beginPath();
+          ctx.arc(-23, -20, 2, 0, Math.PI * 2);
+          ctx.arc(-23, 20, 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Ceramic cylinder body (Left segment)
+          const gradCyl = ctx.createLinearGradient(0, -14, 0, 16);
+          gradCyl.addColorStop(0, '#f1f5f9');
+          gradCyl.addColorStop(0.3, '#cbd5e1');
+          gradCyl.addColorStop(0.8, '#94a3b8');
+          gradCyl.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradCyl;
+          ctx.fillRect(-18, -14, 58, 30);
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(-18, -14, 58, 30);
+
+          // Resistance wire winding coils (amber/nichrome)
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let wx = -14; wx <= 40; wx += 4) {
+            ctx.moveTo(wx, -13);
+            ctx.lineTo(wx, 15);
+          }
+          ctx.stroke();
+
+          // Top metal slider guide rod (Left segment)
+          const gradRod = ctx.createLinearGradient(0, -24, 0, -18);
+          gradRod.addColorStop(0, '#ffffff');
+          gradRod.addColorStop(0.5, '#cbd5e1');
+          gradRod.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradRod;
+          ctx.fillRect(-22, -24, 62, 5);
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-22, -24, 62, 5);
+
+          // Terminal Post A (Red binding post)
+          ctx.fillStyle = '#dc2626';
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(-23, 0, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(-23, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Terminal Label "A"
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('A', -23, -12);
+          ctx.restore();
+
+        } else if (t.subtype === 'var_right') {
+          // Terminal B connections
+          drawPin(1, 10); // Pin 1 (Right end)
+          drawPin(2, 10); // Pin 2 (Bottom)
+          drawPin(0, 10); // Pin 0 (Top support)
+
+          // Pin traces to terminal & support
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          // Right pin 1 -> terminal
+          ctx.moveTo(40, 0); ctx.lineTo(24, 0);
+          // Bottom pin 2 -> terminal
+          ctx.moveTo(0, 40); ctx.lineTo(0, 24); ctx.lineTo(20, 14);
+          // Top pin 0 -> support rod
+          ctx.moveTo(0, -40); ctx.lineTo(0, -22); ctx.lineTo(20, -22);
+          ctx.stroke();
+
+          // Base mounting bracket / Stand (Right)
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(18, -26, 10, 52, 3);
+          else ctx.rect(18, -26, 10, 52);
+          ctx.fill();
+          ctx.stroke();
+
+          // Screws on bracket
+          ctx.fillStyle = '#94a3b8';
+          ctx.beginPath();
+          ctx.arc(23, -20, 2, 0, Math.PI * 2);
+          ctx.arc(23, 20, 2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Ceramic cylinder body (Right segment)
+          const gradCyl = ctx.createLinearGradient(0, -14, 0, 16);
+          gradCyl.addColorStop(0, '#f1f5f9');
+          gradCyl.addColorStop(0.3, '#cbd5e1');
+          gradCyl.addColorStop(0.8, '#94a3b8');
+          gradCyl.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradCyl;
+          ctx.fillRect(-40, -14, 58, 30);
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(-40, -14, 58, 30);
+
+          // Resistance wire winding coils
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let wx = -40; wx <= 14; wx += 4) {
+            ctx.moveTo(wx, -13);
+            ctx.lineTo(wx, 15);
+          }
+          ctx.stroke();
+
+          // Top metal slider guide rod (Right segment)
+          const gradRod = ctx.createLinearGradient(0, -24, 0, -18);
+          gradRod.addColorStop(0, '#ffffff');
+          gradRod.addColorStop(0.5, '#cbd5e1');
+          gradRod.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradRod;
+          ctx.fillRect(-40, -24, 62, 5);
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-40, -24, 62, 5);
+
+          // Terminal Post B (Blue binding post)
+          ctx.fillStyle = '#0284c7';
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(23, 0, 7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(23, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Terminal Label "B"
+          ctx.fillStyle = '#38bdf8';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('B', 23, -12);
+          ctx.restore();
+
+        } else if (t.subtype === 'var_mid') {
+          // Terminal C (Wiper) connections
+          drawPin(0, 10); // Pin 0 (Top Wiper terminal C)
+          drawPin(2, 10); // Pin 2 (Bottom Wiper terminal C)
+
+          // Pin traces to top guide rod & terminal C
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, -40); ctx.lineTo(0, -24);
+          ctx.moveTo(0, 40); ctx.lineTo(0, 24);
+          ctx.stroke();
+
+          // Ceramic cylinder body (Mid segment)
+          const gradCyl = ctx.createLinearGradient(0, -14, 0, 16);
+          gradCyl.addColorStop(0, '#f1f5f9');
+          gradCyl.addColorStop(0.3, '#cbd5e1');
+          gradCyl.addColorStop(0.8, '#94a3b8');
+          gradCyl.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradCyl;
+          ctx.fillRect(-40, -14, 80, 30);
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(-40, -14, 80, 30);
+
+          // Resistance wire winding coils (Mid segment)
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let wx = -40; wx <= 40; wx += 4) {
+            ctx.moveTo(wx, -13);
+            ctx.lineTo(wx, 15);
+          }
+          ctx.stroke();
+
+          // Top metal slider guide rod (Mid segment)
+          const gradRod = ctx.createLinearGradient(0, -24, 0, -18);
+          gradRod.addColorStop(0, '#ffffff');
+          gradRod.addColorStop(0.5, '#cbd5e1');
+          gradRod.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradRod;
+          ctx.fillRect(-40, -24, 80, 5);
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-40, -24, 80, 5);
+
+          // Terminal Post C (Wiper Amber Binding Post) on top rail
+          ctx.fillStyle = '#f59e0b';
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, -24, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(0, -24, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Label "C" for wiper
+          ctx.fillStyle = '#fde047';
+          ctx.font = 'bold 11px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText('C', 0, -33);
+          ctx.restore();
+
+          // ==========================================
+          // THE MOVABLE SLIDER LEVER & ROD (中間的桿子與滑動觸頭)
+          // ==========================================
+          // Across the 3-tile span (slider moves from x = -70 to +70 relative to mid tile)
+          const sliderX = -70 + ratio * 140;
+
+          // 1. Metal slider sleeve/collar encircling the guide rod
+          ctx.fillStyle = '#f8fafc';
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(sliderX - 8, -26, 16, 9, 2);
+          else ctx.rect(sliderX - 8, -26, 16, 9);
+          ctx.fill();
+          ctx.stroke();
+
+          // 2. Spring contact wiper brush pressing against the resistance coil
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(sliderX - 4, -18);
+          ctx.lineTo(sliderX - 4, 3);
+          ctx.moveTo(sliderX + 4, -18);
+          ctx.lineTo(sliderX + 4, 3);
+          ctx.stroke();
+
+          // Contact touch pads on the coil
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(sliderX - 4, 3, 2.5, 0, Math.PI * 2);
+          ctx.arc(sliderX + 4, 3, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 3. The Upward Adjustment Rod / Handle Lever (中間的桿子與手柄)
+          const gradStem = ctx.createLinearGradient(sliderX - 2, 0, sliderX + 2, 0);
+          gradStem.addColorStop(0, '#94a3b8');
+          gradStem.addColorStop(0.5, '#f8fafc');
+          gradStem.addColorStop(1, '#64748b');
+          ctx.fillStyle = gradStem;
+          ctx.fillRect(sliderX - 2.5, -34, 5, 9);
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sliderX - 2.5, -34, 5, 9);
+
+          // Top Ergonomic Grip Knob (調節手柄)
+          const gradKnob = ctx.createLinearGradient(0, -38, 0, -28);
+          gradKnob.addColorStop(0, '#38bdf8');
+          gradKnob.addColorStop(1, '#0284c7');
+          ctx.fillStyle = gradKnob;
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(sliderX - 9, -38, 18, 9, 3);
+          else ctx.rect(sliderX - 9, -38, 18, 9);
+          ctx.fill();
+          ctx.stroke();
+
+          // Grip texture lines on the knob
+          ctx.strokeStyle = '#bae6fd';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sliderX - 4, -36); ctx.lineTo(sliderX - 4, -31);
+          ctx.moveTo(sliderX, -36); ctx.lineTo(sliderX, -31);
+          ctx.moveTo(sliderX + 4, -36); ctx.lineTo(sliderX + 4, -31);
+          ctx.stroke();
+
+          // 4. Digital Value & Ratio Badge
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(-42, 21, 84, 16, 4);
+          else ctx.rect(-42, 21, 84, 16);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#38bdf8';
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const rVal = (totalR * ratio).toFixed(0);
+          ctx.fillText(`${rVal}Ω / ${totalR}Ω (${Math.round(ratio * 100)}%)`, 0, 29);
+          ctx.restore();
+
+        } else {
+          // Single tile fallback
+          drawPin(0, 10);
+          drawPin(1, 10);
+          drawPin(2, 10);
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(0, -30);
+          ctx.lineTo(0, -20);
+          ctx.moveTo(0, 30);
+          ctx.lineTo(0, 20);
+          ctx.moveTo(30, 0);
+          ctx.lineTo(15, 0);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(0, -20);
+          ctx.lineTo(6, -15);
+          ctx.lineTo(-6, -5);
+          ctx.lineTo(6, 5);
+          ctx.lineTo(-6, 15);
+          ctx.lineTo(0, 20);
+          ctx.stroke();
+
+          const wy = -20 + (ratio * 40);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.moveTo(15, 0);
+          ctx.lineTo(15, wy);
+          ctx.lineTo(6, wy);
+          ctx.stroke();
+          
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.moveTo(6, wy);
+          ctx.lineTo(10, wy - 4);
+          ctx.lineTo(10, wy + 4);
+          ctx.fill();
+
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.save();
+          ctx.rotate((-t.rotation * Math.PI) / 2);
+          ctx.fillText((t.value || 100) + 'Ω', 0, 36);
           ctx.restore();
         }
       } else if (t.type === 'switch' && t.subtype === 'sel13') {

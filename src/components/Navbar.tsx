@@ -5,27 +5,50 @@
 
 import React from 'react';
 import { AppMode } from '../types';
-import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap, Menu, Wrench, Sun, Moon } from 'lucide-react';
+import { Cpu, Plug, GitBranch, Zap, Puzzle, GraduationCap, Menu, Wrench, Sun, Moon, Pin } from 'lucide-react';
 
 interface NavbarProps {
   currentMode: AppMode;
   onSwitchMode: (mode: AppMode) => void;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
+  isLeftSidebarOpen?: boolean;
+  isRightSidebarOpen?: boolean;
+  isLeftPinned?: boolean;
+  isRightPinned?: boolean;
   isDarkMode: boolean;
   onToggleTheme: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onToggleLeftSidebar, onToggleRightSidebar, isDarkMode, onToggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentMode,
+  onSwitchMode,
+  onToggleLeftSidebar,
+  onToggleRightSidebar,
+  isLeftSidebarOpen = true,
+  isRightSidebarOpen = true,
+  isLeftPinned = true,
+  isRightPinned = true,
+  isDarkMode,
+  onToggleTheme,
+}) => {
   return (
     <header className="w-full max-w-full h-auto min-h-[60px] py-2 md:py-0 bg-slate-950 border-b border-slate-800 flex flex-col md:flex-row items-center px-3 md:px-5 justify-between shadow-lg z-20 select-none gap-3 md:gap-0">
       <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start min-w-0">
         <div className="flex items-center gap-3 min-w-0">
           <button 
-            className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className={`p-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+              isLeftSidebarOpen
+                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 shadow-sm'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
             onClick={onToggleLeftSidebar}
+            title={isLeftSidebarOpen ? "收合左側欄 (專案與設定)" : "展開左側欄 (專案與設定)"}
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
+            {isLeftPinned && isLeftSidebarOpen && (
+              <Pin className="w-3 h-3 text-amber-400 fill-amber-400 hidden sm:block" />
+            )}
           </button>
           <div className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-500/20 shrink-0 hidden sm:block">
             <Cpu className="text-white w-5 h-5 md:w-6 md:h-6" />
@@ -52,10 +75,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentMode, onSwitchMode, onTog
             <span>Engine: Unified</span>
           </div>
           <button 
-            className="xl:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+            className={`p-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+              isRightSidebarOpen
+                ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-sm'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
             onClick={onToggleRightSidebar}
+            title={isRightSidebarOpen ? "收合右側欄 (工具與元件箱)" : "展開右側欄 (工具與元件箱)"}
           >
-            <Wrench className="w-6 h-6" />
+            <Wrench className="w-5 h-5" />
+            {isRightPinned && isRightSidebarOpen && (
+              <Pin className="w-3 h-3 text-amber-400 fill-amber-400 hidden sm:block" />
+            )}
           </button>
         </div>
       </div>

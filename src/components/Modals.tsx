@@ -72,6 +72,8 @@ export const Modals: React.FC<ModalsProps> = ({
                   ? '設定交流電 (AC)'
                   : tile.type === 'capacitor'
                   ? '設定電容值'
+                  : (tile.type === 'resistor_var' || (tile.type === 'resistor' && (tile.subtype === 'var' || tile.subtype.startsWith('var_'))))
+                  ? '設定滑動變阻器總電阻'
                   : tile.type === 'logic' && tile.subtype === 'clock'
                   ? '設定時脈產生器'
                   : '設定屬性')}
@@ -87,6 +89,8 @@ export const Modals: React.FC<ModalsProps> = ({
                     ? '頻率 (Hz) [建議 0.1 ~ 5 之間]：'
                     : tile.type === 'capacitor'
                     ? '容量 (μF) [預設 10000]：'
+                    : (tile.type === 'resistor_var' || (tile.type === 'resistor' && (tile.subtype === 'var' || tile.subtype.startsWith('var_'))))
+                    ? '總電阻值 (Ω) [預設 100]：'
                     : tile.type === 'logic' && tile.subtype === 'clock'
                     ? '頻率 (Hz) [建議 0.5 ~ 10 之間]：'
                     : mode === 'timer'

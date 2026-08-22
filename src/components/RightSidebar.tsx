@@ -22,7 +22,13 @@ import {
   Bug,
   X,
   Link,
-  Info, ChevronDown, ChevronRight } from 'lucide-react';
+  Info,
+  ChevronDown,
+  ChevronRight,
+  Pin,
+  PinOff,
+  Wrench,
+} from 'lucide-react';
 
 interface RightSidebarProps {
   currentMode: AppMode;
@@ -40,6 +46,9 @@ interface RightSidebarProps {
   placementType: string;
   placementSubtype: string;
   placementRotation: number;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onClose?: () => void;
   onSetTool: (tool: ToolType) => void;
   onSetMeterChannel: (ch: string) => void;
   onSetPlacement: (typeStr: string, el?: HTMLElement | null) => void;
@@ -88,6 +97,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   placementType,
   placementSubtype,
   placementRotation,
+  isPinned,
+  onTogglePin,
+  onClose,
   onSetTool,
   onSetMeterChannel,
   onSetPlacement,
@@ -154,7 +166,39 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   }, [oscVal]);
 
   return (
-    <aside className="w-[300px] h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0">
+    <aside className="w-[300px] h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0 shadow-lg">
+      {/* Sidebar Control Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950 border-b border-slate-800 text-xs select-none">
+        <div className="flex items-center gap-1.5 font-bold text-blue-400">
+          <Wrench className="w-4 h-4" />
+          <span>工具與元件箱</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {onTogglePin && (
+            <button
+              onClick={onTogglePin}
+              title={isPinned ? "已鎖定操作欄（點擊解除鎖定，動作後自動縮回）" : "未鎖定（點擊鎖定操作欄，動作後不縮回）"}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-150 shadow-sm border ${
+                isPinned
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 ring-1 ring-amber-500/30'
+                  : 'bg-slate-800/90 text-slate-400 hover:text-slate-200 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              {isPinned ? <Pin className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> : <PinOff className="w-3.5 h-3.5" />}
+              <span>{isPinned ? '已鎖定' : '鎖定'}</span>
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="收合操作欄"
+              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
       {/* Meters Panel (Electronic Mode) */}
       {currentMode === 'electronic' && (
         <div className="p-3.5 border-b-2 border-emerald-900/50 bg-slate-950/80">
@@ -604,10 +648,28 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
               <span className="text-cyan-400 font-bold">╟╢</span> 電容器 (充放電延遲)
             </button>
             <button
+              className={`${isPlacementSelected('resistor_var') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
+              onClick={() => onSetPlacement('resistor_var')}
+            >
+              <span className="text-amber-500 font-bold">🎛️</span> 滑動變阻器 (3接點)
+            </button>
+            <button
+              className={`${isPlacementSelected('switch_spst') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
+              onClick={() => onSetPlacement('switch_spst')}
+            >
+              <span className="text-slate-300 font-bold">🕹️</span> 單刀開關 (SPST)
+            </button>
+            <button
+              className={`${isPlacementSelected('load_lightbulb') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
+              onClick={() => onSetPlacement('load_lightbulb')}
+            >
+              <span className="text-yellow-500 font-bold">💡</span> 傳統白熾燈泡
+            </button>
+            <button
               className={`${isPlacementSelected('led_3v') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} w-full p-2  rounded-lg text-xs font-semibold text-slate-200 text-left flex items-center gap-2`}
               onClick={() => onSetPlacement('led_3v')}
             >
-              <span className="text-yellow-400 font-bold">💡</span> 3V/20mA LED (2接點)
+              <span className="text-yellow-400 font-bold">🔴</span> 3V/20mA LED (極性)
             </button>
           </div>
 
