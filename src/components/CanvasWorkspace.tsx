@@ -392,7 +392,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         if (t && (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_'))))) {
           updateSlidePotentiometer(rawX, rawY, t, mx, my);
           setDragResistorGroupId(t.groupId || `r_${mx}_${my}`);
-        } else if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
+        } else if (t && ((t.type === 'btn' && t.subtype !== 'toggle') || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
           setGrid((prev) => {
             const curr = prev[my][mx];
             if (!curr) return prev;
@@ -577,7 +577,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     // Interact Mode
     if (currentTool === 'interact') {
-      if (t && (t.type === 'btn' || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
+      if (t && ((t.type === 'btn' && t.subtype !== 'toggle') || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
         setGrid((prev) => {
           const curr = prev[mousePos.y][mousePos.x];
           if (!curr) return prev;
@@ -596,6 +596,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             })
           );
         });
+      } else if (t && t.type === 'btn' && t.subtype === 'toggle') {
+        const ns = !t.isActive;
+        setGrid((prev) => {
+          const curr = prev[mousePos.y][mousePos.x];
+          if (!curr) return prev;
+          return prev.map((row) =>
+            row.map((c) => {
+              if (c === curr) return Object.assign(new Tile(), c, { isActive: ns });
+              if (c && curr.groupId && c.groupId === curr.groupId) return Object.assign(new Tile(), c, { isActive: ns });
+              if (
+                c && curr.labels && curr.labels[4] &&
+                c.labels && c.labels[4] === curr.labels[4] &&
+                c.type === 'btn' && c.subtype === 'toggle'
+              ) {
+                return Object.assign(new Tile(), c, { isActive: ns });
+              }
+              return c;
+            })
+          );
+        });
+      } else if (t && t.type === 'protection' && (t.subtype === 'ol_2p' || t.subtype === 'ol_3p')) {
+        const ns = !t.isActive;
+        setGrid((prev) =>
+          prev.map((row) =>
+            row.map((c) => (c && c.groupId === t.groupId ? Object.assign(new Tile(), c, { isActive: ns }) : c))
+          )
+        );
       } else if (t && t.type === 'breaker') {
         const ns = !t.isActive;
         setGrid((prev) =>
@@ -1076,6 +1103,50 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         } else {
           onShowAlert('空間不足，斷路器需要橫向連續 2 格空位！');
         }
+      } else if (placementType === 'relay' && placementSubtype === 'mc_no_2') {
+        if (
+          mousePos.x + 1 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y)
+        ) {
+          const gid = 'mc_' + Date.now();
+          const t1 = new Tile('relay', 'mc_no_2');
+          t1.groupId = gid;
+          const t2 = new Tile('relay', 'mc_no_2');
+          t2.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = t1;
+            next[mousePos.y][mousePos.x + 1] = t2;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，MC用2路A接點需要橫向連續 2 格空位！');
+        }
+      } else if (placementType === 'relay' && placementSubtype === 'mc_no_3') {
+        if (
+          mousePos.x + 2 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y) &&
+          isCellAvailable(mousePos.x + 2, mousePos.y)
+        ) {
+          const gid = 'mc_' + Date.now();
+          const t1 = new Tile('relay', 'mc_no_3');
+          t1.groupId = gid;
+          const t2 = new Tile('relay', 'mc_no_3');
+          t2.groupId = gid;
+          const t3 = new Tile('relay', 'mc_no_3');
+          t3.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = t1;
+            next[mousePos.y][mousePos.x + 1] = t2;
+            next[mousePos.y][mousePos.x + 2] = t3;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，MC用3路A接點需要橫向連續 3 格空位！');
+        }
       } else if (placementType === 'breaker' && placementSubtype === '3p') {
         if (
           mousePos.x + 2 < gridSize &&
@@ -1099,6 +1170,50 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           });
         } else {
           onShowAlert('空間不足，斷路器3P需要橫向連續 3 格空位！');
+        }
+      } else if (placementType === 'protection' && placementSubtype === 'ol_2p') {
+        if (
+          mousePos.x + 1 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y)
+        ) {
+          const gid = 'ol_' + Date.now();
+          const t1 = new Tile('protection', 'ol_2p');
+          t1.groupId = gid;
+          const t2 = new Tile('protection', 'ol_2p');
+          t2.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = t1;
+            next[mousePos.y][mousePos.x + 1] = t2;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，OL 2P需要橫向連續 2 格空位！');
+        }
+      } else if (placementType === 'protection' && placementSubtype === 'ol_3p') {
+        if (
+          mousePos.x + 2 < gridSize &&
+          isCellAvailable(mousePos.x, mousePos.y) &&
+          isCellAvailable(mousePos.x + 1, mousePos.y) &&
+          isCellAvailable(mousePos.x + 2, mousePos.y)
+        ) {
+          const gid = 'ol_' + Date.now();
+          const t1 = new Tile('protection', 'ol_3p');
+          t1.groupId = gid;
+          const t2 = new Tile('protection', 'ol_3p');
+          t2.groupId = gid;
+          const t3 = new Tile('protection', 'ol_3p');
+          t3.groupId = gid;
+          safeSetGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[mousePos.y][mousePos.x] = t1;
+            next[mousePos.y][mousePos.x + 1] = t2;
+            next[mousePos.y][mousePos.x + 2] = t3;
+            return next;
+          });
+        } else {
+          onShowAlert('空間不足，OL 3P需要橫向連續 3 格空位！');
         }
       } else if (placementType === 'platform' && placementSubtype === 'main') {
         if (
@@ -1249,7 +1364,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         if (placementSubtype === 'counter_coil') newT.measureVal = dVal;
         newT.rotation = placementRotation;
 
-        if (placementType === 'btn' && placementSubtype === 'no') {
+        if (placementType === 'btn' && (placementSubtype === 'no' || placementSubtype === 'toggle')) {
           newT.labels[1] = '13';
           newT.labels[2] = '14';
         } else if (placementType === 'btn' && placementSubtype === 'nc') {
@@ -1289,7 +1404,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     setGrid((prev) =>
       prev.map((row) =>
         row.map((c) =>
-          c && (c.type === 'btn' || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
+          c && ((c.type === 'btn' && c.subtype !== 'toggle') || (c.type === 'logic' && c.subtype === 'pushbtn') || (c.type === 'switch' && (c.subtype === '4way_top' || c.subtype === '4way_bot')))
             ? Object.assign(new Tile(), c, { isActive: false })
             : c
         )
@@ -1504,8 +1619,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                   (t.type === 'plc' ||
                     t.type === 'terminal' ||
                     t.type === 'pneumatic' ||
+                    t.type === 'switch' ||
+                    t.type === 'load' ||
                     t.subtype === 'no' ||
+                    t.subtype === 'toggle' ||
                     t.subtype === 'nc' ||
+                    t.subtype === 'mc_no_2' ||
+                    t.subtype === 'mc_no_3' ||
+                    t.subtype === 'ol_2p' ||
+                    t.subtype === 'ol_3p' ||
                     t.subtype === 'pls' ||
                     t.subtype === 'plf' ||
                     t.subtype === 'plc_a' ||
@@ -1702,6 +1824,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const bot = new Tile('switch', '4way_bot');
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: top });
             ghostTiles.push({ x: mousePos.x, y: mousePos.y + 1, tile: bot });
+          } else if (pType === 'relay' && pSubtype === 'mc_no_2') {
+            const t1 = new Tile('relay', 'mc_no_2');
+            const t2 = new Tile('relay', 'mc_no_2');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+          } else if (pType === 'relay' && pSubtype === 'mc_no_3') {
+            const t1 = new Tile('relay', 'mc_no_3');
+            const t2 = new Tile('relay', 'mc_no_3');
+            const t3 = new Tile('relay', 'mc_no_3');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: t3 });
           } else if (pType === 'breaker' && pSubtype === 'mcb') {
             const t1 = new Tile('breaker', 'mcb');
             const t2 = new Tile('breaker', 'mcb');
@@ -1711,6 +1845,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const t1 = new Tile('breaker', '3p');
             const t2 = new Tile('breaker', '3p');
             const t3 = new Tile('breaker', '3p');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+            ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: t3 });
+          } else if (pType === 'protection' && pSubtype === 'ol_2p') {
+            const t1 = new Tile('protection', 'ol_2p');
+            const t2 = new Tile('protection', 'ol_2p');
+            ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
+            ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
+          } else if (pType === 'protection' && pSubtype === 'ol_3p') {
+            const t1 = new Tile('protection', 'ol_3p');
+            const t2 = new Tile('protection', 'ol_3p');
+            const t3 = new Tile('protection', 'ol_3p');
             ghostTiles.push({ x: mousePos.x, y: mousePos.y, tile: t1 });
             ghostTiles.push({ x: mousePos.x + 1, y: mousePos.y, tile: t2 });
             ghostTiles.push({ x: mousePos.x + 2, y: mousePos.y, tile: t3 });
@@ -1788,7 +1934,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const ghostTile = new Tile(pType, pSubtype);
             ghostTile.rotation = placementRotation;
 
-            if (pType === 'btn' && pSubtype === 'no') {
+            if (pType === 'btn' && (pSubtype === 'no' || pSubtype === 'toggle')) {
               ghostTile.labels[1] = '13';
               ghostTile.labels[2] = '14';
             } else if (pType === 'btn' && pSubtype === 'nc') {
@@ -2650,6 +2796,57 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.lineTo(-12, -4);
         }
         ctx.stroke();
+      } else if (t.type === 'protection' && (t.subtype === 'ol_2p' || t.subtype === 'ol_3p')) {
+        // Draw standard pins
+        drawPin(0, 16);
+        drawPin(2, 16);
+        
+        ctx.strokeStyle = '#f87171'; // Red color for OL
+        ctx.lineWidth = 3;
+        
+        // Draw connection line
+        ctx.beginPath();
+        if (t.isActive) {
+          ctx.moveTo(0, -16);
+          ctx.lineTo(0, -6);
+          ctx.moveTo(0, 16);
+          ctx.lineTo(0, 6);
+        } else {
+          ctx.moveTo(0, -16);
+          ctx.lineTo(0, 16);
+        }
+        ctx.stroke();
+
+        // Draw thermal heating element (square-wave zig-zag)
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(6, -6);
+        ctx.lineTo(6, 6);
+        ctx.lineTo(0, 6);
+        ctx.stroke();
+
+        // Draw dashed line representing linkage to auxiliary contacts
+        ctx.strokeStyle = '#f87171';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(-16, 0);
+        ctx.lineTo(16, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        if (t.isActive) {
+           ctx.fillStyle = '#ef4444';
+           ctx.font = '24px Arial';
+           ctx.textAlign = 'center';
+           ctx.textBaseline = 'middle';
+           ctx.fillText('💥', 10, -10);
+        }
+
+        ctx.fillStyle = '#f87171';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.labels?.[4] || 'OL1', 0, 32);
       } else if (t.type === 'protection' && t.subtype === 'fuse') {
         drawPin(0, 16);
         drawPin(2, 16);
@@ -2706,11 +2903,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         t.type === 'btn' ||
         (t.type === 'relay' && (
           t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
-          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_') ||
+          t.subtype === 'mc_no_2' || t.subtype === 'mc_no_3'
         ))
       ) {
         const isCon = t.subtype === 'con' || t.subtype === 'ton_con' || t.subtype === 'tof_con';
-        const isNo = t.subtype === 'no' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && t.subtype === 'no');
+        const isNo = t.subtype === 'no' || t.subtype === 'toggle' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && (t.subtype === 'no' || t.subtype === 'toggle')) || t.subtype === 'mc_no_2' || t.subtype === 'mc_no_3';
         const isNc = t.subtype === 'nc' || t.subtype === 'ton_nc' || t.subtype === 'tof_nc' || (t.type === 'btn' && t.subtype === 'nc');
 
         const isTon = t.type === 'relay' && t.subtype.startsWith('ton_');
@@ -2866,17 +3064,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 2;
             
-            // E shape
-            ctx.beginPath();
-            ctx.moveTo(eX, -6);
-            ctx.lineTo(eX, 6);
-            ctx.moveTo(eX, -6);
-            ctx.lineTo(eX + 4, -6);
-            ctx.moveTo(eX, 0);
-            ctx.lineTo(eX + 4, 0);
-            ctx.moveTo(eX, 6);
-            ctx.lineTo(eX + 4, 6);
-            ctx.stroke();
+            if (t.subtype === 'toggle') {
+              ctx.beginPath();
+              ctx.moveTo(eX + 4, -8);
+              ctx.lineTo(eX, -8);
+              ctx.lineTo(eX, 8);
+              ctx.lineTo(eX - 4, 8);
+              ctx.stroke();
+            } else {
+              // E shape
+              ctx.beginPath();
+              ctx.moveTo(eX, -6);
+              ctx.lineTo(eX, 6);
+              ctx.moveTo(eX, -6);
+              ctx.lineTo(eX + 4, -6);
+              ctx.moveTo(eX, 0);
+              ctx.lineTo(eX + 4, 0);
+              ctx.moveTo(eX, 6);
+              ctx.lineTo(eX + 4, 6);
+              ctx.stroke();
+            }
 
             // Dashed line
             ctx.beginPath();
@@ -2944,17 +3151,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 2;
             
-            // E shape
-            ctx.beginPath();
-            ctx.moveTo(eX, -6);
-            ctx.lineTo(eX, 6);
-            ctx.moveTo(eX, -6);
-            ctx.lineTo(eX + 4, -6);
-            ctx.moveTo(eX, 0);
-            ctx.lineTo(eX + 4, 0);
-            ctx.moveTo(eX, 6);
-            ctx.lineTo(eX + 4, 6);
-            ctx.stroke();
+            if (t.subtype === 'toggle') {
+              ctx.beginPath();
+              ctx.moveTo(eX + 4, -8);
+              ctx.lineTo(eX, -8);
+              ctx.lineTo(eX, 8);
+              ctx.lineTo(eX - 4, 8);
+              ctx.stroke();
+            } else {
+              // E shape
+              ctx.beginPath();
+              ctx.moveTo(eX, -6);
+              ctx.lineTo(eX, 6);
+              ctx.moveTo(eX, -6);
+              ctx.lineTo(eX + 4, -6);
+              ctx.moveTo(eX, 0);
+              ctx.lineTo(eX + 4, 0);
+              ctx.moveTo(eX, 6);
+              ctx.lineTo(eX + 4, 6);
+              ctx.stroke();
+            }
 
             // Dashed line
             ctx.beginPath();
@@ -2971,7 +3187,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.textAlign = 'center';
         ctx.save();
         ctx.rotate((-t.rotation * Math.PI) / 2);
-        ctx.fillText(t.labels[4] || (t.type === 'btn' ? 'BTN' : 'RELAY'), 0, 36);
+        ctx.fillText(t.labels[4] || (t.subtype === 'toggle' ? 'TOGGLE' : (t.type === 'btn' ? 'BTN' : 'RELAY')), 0, 36);
         
         if (isTon || isTof) {
           let displayMs = t.value || 0;
@@ -3856,6 +4072,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         ctx.moveTo(10, -10);
         ctx.lineTo(-10, 10);
         ctx.stroke();
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText(t.labels[4] || 'PL', 0, 36);
+        ctx.restore();
       } else if (t.type === 'load' && t.subtype === 'buzzer') {
         drawPin(0, 16);
         drawPin(2, 16);
@@ -3876,6 +4100,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ctx.stroke();
           ctx.translate(Math.random() * 2 - 1, Math.random() * 2 - 1);
         }
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.save();
+        ctx.rotate((-t.rotation * Math.PI) / 2);
+        ctx.fillText(t.labels[4] || 'BZ', 0, 36);
+        ctx.restore();
       } else if (t.type === 'motor') {
         if (t.subtype === '3phase') {
           drawPin(0, 16);
@@ -4835,6 +5067,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     } else if (logicLevel === 'w-5-2') {
       tutorialTitle = 'w-5-2 極限開關應用 (Limit Switch)';
       tutorialDesc = '任務：電動捲門控制。按上樓按鈕，捲門上升；碰到頂部的極限開關時自動停止。';
+    } else if (logicLevel === 'class_c_u1_1') {
+      tutorialTitle = '第一題 單相感應電動機順序起動控制';
+      tutorialDesc = '任務：檢修單相感應電動機順序起動控制電路。';
+    } else if (logicLevel === 'class_c_u1_2') {
+      tutorialTitle = '第二題 自動台車分料系統控制電路';
+      tutorialDesc = '任務：檢修自動台車分料系統控制電路。';
+    } else if (logicLevel === 'class_c_u1_7') {
+      tutorialTitle = '第七題 往復式送料機自動控制電路';
+      tutorialDesc = '任務：檢修往復式送料機自動控制電路，使用三相電源、接觸器及極限開關進行控制。';
     }
   }
 
@@ -4885,6 +5126,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 levels: [
                   { id: 'w-5-1', title: '單元 5-1：過載保護 (Thermal Overload)', desc: '將積熱電驛 (TH-RY) 串入電路。當馬達過載跳脫時，必須切斷控制電源並點亮「故障指示燈 (OL)」。' },
                   { id: 'w-5-2', title: '單元 5-2：極限開關應用 (Limit Switch)', desc: '電動捲門控制。按上樓按鈕，捲門上升；碰到頂部的極限開關時自動停止。' }
+                ]
+              },
+              {
+                title: '工業配線丙級：故障檢修 (Troubleshooting)',
+                levels: [
+                  { id: 'class_c_u1_1', title: '第一題：單相感應電動機順序起動控制', desc: '檢修單相感應電動機順序起動控制電路。' },
+                  { id: 'class_c_u1_2', title: '第二題：自動台車分料系統控制電路', desc: '檢修自動台車分料系統控制電路。' },
+                  { id: 'class_c_u1_7', title: '第七題：往復式送料機自動控制電路', desc: '檢修往復式送料機自動控制電路，使用三相電源、接觸器及極限開關進行控制。' }
                 ]
               }
             ].map((category, idx) => (

@@ -576,6 +576,20 @@ export const WiringEngine = {
       }
     }
 
+    // Evaluate Overload Relays (OL)
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[0].length; x++) {
+        const t = grid[y][x];
+        if (t && t.type === 'protection' && (t.subtype === 'ol_2p' || t.subtype === 'ol_3p')) {
+          if (t.isActive && t.labels && t.labels[4]) {
+            const raw = t.labels[4];
+            activeContacts.add(raw);
+            activeContacts.add(raw.trim().toUpperCase());
+          }
+        }
+      }
+    }
+
     // Evaluate PLC output coils
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[0].length; x++) {
@@ -653,7 +667,8 @@ export const WiringEngine = {
         }
         const isRelayContact = t && t.type === 'relay' && (
           t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
-          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+          t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_') ||
+          t.subtype === 'mc_no_2' || t.subtype === 'mc_no_3'
         );
         if (isRelayContact) {
           if (t.labels && t.labels[4]) {
@@ -696,12 +711,16 @@ export const WiringEngine = {
             t.subtype === 'plc_n' ||
             t.subtype === 'no' ||
             t.subtype === 'nc' ||
+            t.subtype === 'mc_no_2' ||
+            t.subtype === 'mc_no_3' ||
             t.subtype === 'pls' ||
             t.subtype === 'plf')
         ) {
           if (
             t.subtype === 'no' ||
             t.subtype === 'nc' ||
+            t.subtype === 'mc_no_2' ||
+            t.subtype === 'mc_no_3' ||
             t.subtype === 'plc_a' ||
             t.subtype === 'plc_b'
           ) {

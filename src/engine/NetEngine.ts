@@ -51,11 +51,12 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
     } else if (mode === 'wiring' || mode === 'plc') {
       const isRelayContact = t.type === 'relay' && (
         t.subtype === 'no' || t.subtype === 'nc' || t.subtype === 'con' ||
-        t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_')
+        t.subtype.startsWith('ton_') || t.subtype.startsWith('tof_') ||
+        t.subtype === 'mc_no_2' || t.subtype === 'mc_no_3'
       );
       if (t.type === 'btn' || isRelayContact) {
         const isCon = t.subtype === 'con' || t.subtype === 'ton_con' || t.subtype === 'tof_con';
-        const isNo = t.subtype === 'no' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && t.subtype === 'no');
+        const isNo = t.subtype === 'no' || t.subtype === 'ton_no' || t.subtype === 'tof_no' || (t.type === 'btn' && (t.subtype === 'no' || t.subtype === 'toggle')) || t.subtype === 'mc_no_2' || t.subtype === 'mc_no_3';
         const isNc = t.subtype === 'nc' || t.subtype === 'ton_nc' || t.subtype === 'tof_nc' || (t.type === 'btn' && t.subtype === 'nc');
 
         if (isCon) {
@@ -75,6 +76,9 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
         groups = [[3], [1]];
       } else if (t.type === 'protection' && t.subtype === 'fuse') {
         groups = t.isBlown ? [[0], [2]] : [[0, 2]];
+      } else if (t.type === 'protection' && (t.subtype === 'ol_2p' || t.subtype === 'ol_3p')) {
+        // Break the main circuit when OL is tripped (active)
+        groups = t.isActive ? [[0], [2]] : [[0, 2]];
       } else if (t.type === 'terminal') {
         groups = [[2]];
       } else if (t.type === 'motor') {

@@ -938,6 +938,34 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                 斷路器3P
               </button>
               <button
+                className={`${isPlacementSelected('protection_ol_2p') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('protection_ol_2p')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <path d="M 25 20 L 25 30 M 25 50 L 25 60" fill="none" stroke="#f87171" strokeWidth="3" />
+                  <path d="M 20 30 L 30 30 L 30 50 L 20 50 Z" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 55 20 L 55 30 M 55 50 L 55 60" fill="none" stroke="#f87171" strokeWidth="3" />
+                  <path d="M 50 30 L 60 30 L 60 50 L 50 50 Z" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 15 40 L 65 40" stroke="#f87171" strokeWidth="2" strokeDasharray="3 3" />
+                </svg>
+                OL 2P
+              </button>
+              <button
+                className={`${isPlacementSelected('protection_ol_3p') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('protection_ol_3p')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <path d="M 20 20 L 20 30 M 20 50 L 20 60" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 16 30 L 24 30 L 24 50 L 16 50 Z" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 40 20 L 40 30 M 40 50 L 40 60" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 36 30 L 44 30 L 44 50 L 36 50 Z" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 60 20 L 60 30 M 60 50 L 60 60" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 56 30 L 64 30 L 64 50 L 56 50 Z" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 10 40 L 70 40" stroke="#f87171" strokeWidth="2" strokeDasharray="3 3" />
+                </svg>
+                OL 3P
+              </button>
+              <button
                 className={`${isPlacementSelected('power_3phase') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
                 onClick={() => onSetPlacement('power_3phase')}
               >
@@ -1025,6 +1053,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 30 40 L 40 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                     </svg>
                 NC 按鈕
+              </button>
+              <button
+                className={`${isPlacementSelected('btn_toggle') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('btn_toggle')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 30 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 20 25 L 16 25 L 16 55 L 12 55" fill="none" stroke="#94a3b8" strokeWidth="2" />
+                      <path d="M 20 40 L 35 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
+                    </svg>
+                交替開關
               </button>
               <button
                 className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
@@ -1242,6 +1284,49 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <text x="40" y="45" fill="#22d3ee" fontSize="16" fontWeight="bold" textAnchor="middle">C</text>
                 </svg>
                 計數器繼電器
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_mc_no_2') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5 col-span-2`}
+                onClick={() => onSetPlacement('relay_mc_no_2')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="17" y="17" width="6" height="6" fill="#94a3b8" />
+                  <rect x="17" y="57" width="6" height="6" fill="#94a3b8" />
+                  <path d="M 20 10 L 20 20 M 20 70 L 20 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                  <path d="M 20 60 L 10 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                  
+                  <rect x="57" y="17" width="6" height="6" fill="#94a3b8" />
+                  <rect x="57" y="57" width="6" height="6" fill="#94a3b8" />
+                  <path d="M 60 10 L 60 20 M 60 70 L 60 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                  <path d="M 60 60 L 50 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                  
+                  <path d="M 15 40 L 65 40" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 2" />
+                </svg>
+                MC用 2路 A接點
+              </button>
+              <button
+                className={`${isPlacementSelected('relay_mc_no_3') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5 col-span-2`}
+                onClick={() => onSetPlacement('relay_mc_no_3')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="17" y="17" width="4" height="6" fill="#94a3b8" />
+                  <rect x="17" y="57" width="4" height="6" fill="#94a3b8" />
+                  <path d="M 19 10 L 19 20 M 19 70 L 19 60" fill="none" stroke="#64748b" strokeWidth="2" />
+                  <path d="M 19 60 L 13 20" fill="none" stroke="#cbd5e1" strokeWidth="2" />
+                  
+                  <rect x="38" y="17" width="4" height="6" fill="#94a3b8" />
+                  <rect x="38" y="57" width="4" height="6" fill="#94a3b8" />
+                  <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="2" />
+                  <path d="M 40 60 L 34 20" fill="none" stroke="#cbd5e1" strokeWidth="2" />
+                  
+                  <rect x="59" y="17" width="4" height="6" fill="#94a3b8" />
+                  <rect x="59" y="57" width="4" height="6" fill="#94a3b8" />
+                  <path d="M 61 10 L 61 20 M 61 70 L 61 60" fill="none" stroke="#64748b" strokeWidth="2" />
+                  <path d="M 61 60 L 55 20" fill="none" stroke="#cbd5e1" strokeWidth="2" />
+                  
+                  <path d="M 16 40 L 64 40" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 2" />
+                </svg>
+                MC用 3路 A接點
               </button>
 </div>
           </div>
@@ -1523,6 +1608,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                       <path d="M 30 40 L 40 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
                     </svg>
                     按鈕 (NC)
+                  </button>
+                  <button
+                    className={`${isPlacementSelected('btn_toggle') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                    onClick={() => onSetPlacement('btn_toggle')}
+                  >
+                    <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                      <rect x="37" y="17" width="6" height="6" fill="#94a3b8" />
+                      <rect x="37" y="57" width="6" height="6" fill="#94a3b8" />
+                      <path d="M 40 10 L 40 20 M 40 70 L 40 60" fill="none" stroke="#64748b" strokeWidth="3" />
+                      <path d="M 40 60 L 30 20" fill="none" stroke="#cbd5e1" strokeWidth="3" />
+                      <path d="M 20 25 L 16 25 L 16 55 L 12 55" fill="none" stroke="#94a3b8" strokeWidth="2" />
+                      <path d="M 20 40 L 35 40" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
+                    </svg>
+                    交替開關
                   </button>
                   <button
                     className={`${isPlacementSelected('switch_sel13') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2 rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}

@@ -3,7 +3,7 @@
  * LeftSidebar Component for Auto Studio Pro
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { AppMode, SubMode, LogicLevelId } from '../types';
 import {
   Settings,
@@ -19,6 +19,8 @@ import {
   Pin,
   PinOff,
   X,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 interface LeftSidebarProps {
@@ -58,6 +60,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 }) => {
   const fileLoadRef = useRef<HTMLInputElement>(null);
   const fileInsertRef = useRef<HTMLInputElement>(null);
+
+  const [showWiringClassC, setShowWiringClassC] = useState(false);
+  const [showWiringClassCUnit1, setShowWiringClassCUnit1] = useState(false);
+  const [showWiringClassCUnit2, setShowWiringClassCUnit2] = useState(false);
 
   return (
     <aside className="w-[260px] h-full bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto z-10 select-none shrink-0 shadow-lg">
@@ -293,7 +299,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </button>
             <button
               className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
-                logicLevel !== 'sandbox'
+                logicLevel !== 'sandbox' && !logicLevel.startsWith('class_c')
                   ? 'bg-amber-800 border-amber-500 text-white shadow'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
               }`}
@@ -314,6 +320,96 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               <ShieldAlert className="w-4 h-4 text-rose-400" />
               <span>實戰除錯模式 (導線不變色)</span>
             </button>
+
+            {/* 工業配線丙級 */}
+            <div className="pt-2">
+              <button
+                className="w-full text-left p-2 bg-slate-800/80 border border-slate-700 rounded-lg text-[11px] font-semibold text-slate-200 shadow flex items-center justify-between hover:bg-slate-700 transition-colors"
+                onClick={() => setShowWiringClassC(!showWiringClassC)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
+                  <span>工業配線丙級</span>
+                </div>
+                {showWiringClassC ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+              
+              {showWiringClassC && (
+                <div className="ml-2 border-l border-slate-700 pl-2 mt-2 flex flex-col gap-2">
+                  {/* 第一單元：故障檢修 */}
+                  <div>
+                    <button
+                      className="w-full text-left p-1.5 rounded text-[11px] font-semibold text-slate-300 flex items-center justify-between hover:bg-slate-800 transition-colors"
+                      onClick={() => setShowWiringClassCUnit1(!showWiringClassCUnit1)}
+                    >
+                      <span>第一單元：故障檢修</span>
+                      {showWiringClassCUnit1 ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    {showWiringClassCUnit1 && (
+                      <div className="ml-2 pl-2 mt-1 flex flex-col gap-1 border-l border-slate-700/50">
+                        {[
+                          { id: 'class_c_u1_1', title: '第一題 單相感應電動機順序起動控制' },
+                          { id: 'class_c_u1_2', title: '第二題 自動台車分料系統控制電路' },
+                          { id: 'class_c_u1_3', title: '第三題 三台輸送帶電動機順序運轉控制' },
+                          { id: 'class_c_u1_4', title: '第四題 三相感應電動機之 Y-△降壓起動控制(一)' },
+                          { id: 'class_c_u1_5', title: '第五題 三相感應電動機之 Y-△降壓起動控制(二)' },
+                          { id: 'class_c_u1_6', title: '第六題 三相感應電動機順序啟閉控制' },
+                          { id: 'class_c_u1_7', title: '第七題 往復式送料機自動控制電路' }
+                        ].map(item => (
+                          <button
+                            key={item.id}
+                            className={`w-full text-left p-1.5 rounded-md text-[10px] transition-colors leading-tight ${
+                              logicLevel === item.id
+                                ? 'bg-blue-700/50 text-white'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            }`}
+                            onClick={() => onLoadLogicLevel(item.id as LogicLevelId)}
+                          >
+                            {item.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 第二單元：配線術科 */}
+                  <div>
+                    <button
+                      className="w-full text-left p-1.5 rounded text-[11px] font-semibold text-slate-300 flex items-center justify-between hover:bg-slate-800 transition-colors"
+                      onClick={() => setShowWiringClassCUnit2(!showWiringClassCUnit2)}
+                    >
+                      <span>第二單元：配線術科</span>
+                      {showWiringClassCUnit2 ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                    {showWiringClassCUnit2 && (
+                      <div className="ml-2 pl-2 mt-1 flex flex-col gap-1 border-l border-slate-700/50">
+                        {[
+                          { id: 'class_c_u2_1', title: '第一題 單相感應電動機正反轉控制' },
+                          { id: 'class_c_u2_2', title: '第二題 乾燥桶控制電路' },
+                          { id: 'class_c_u2_3', title: '第三題 三台輸送帶電動機順序運轉控制' },
+                          { id: 'class_c_u2_4', title: '第四題 二台輸送帶電動機順序運轉控制' },
+                          { id: 'class_c_u2_5', title: '第五題 二台抽水機交替運轉控制' },
+                          { id: 'class_c_u2_6', title: '第六題 三相感應電動機 Y-Δ降壓起動控制' },
+                          { id: 'class_c_u2_7', title: '第七題 三相感應電動機正反轉控制及盤箱裝置' }
+                        ].map(item => (
+                          <button
+                            key={item.id}
+                            className={`w-full text-left p-1.5 rounded-md text-[10px] transition-colors leading-tight ${
+                              logicLevel === item.id
+                                ? 'bg-emerald-700/50 text-white'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            }`}
+                            onClick={() => onLoadLogicLevel(item.id as LogicLevelId)}
+                          >
+                            {item.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

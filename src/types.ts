@@ -37,7 +37,9 @@ export type LogicLevelId = 'sandbox' | '0-1' | '0-2' | '0-3' | '0-4' | 'tutorial
   'w-2-1' | 'w-2-2' | 'w-2-3' | 'w-2-4' |
   'w-3-1' | 'w-3-2' | 'w-3-3' |
   'w-4-1' | 'w-4-2' | 'w-4-3' | 'w-4-4' |
-  'w-5-1' | 'w-5-2';
+  'w-5-1' | 'w-5-2' |
+  'class_c_u1_1' | 'class_c_u1_2' | 'class_c_u1_3' | 'class_c_u1_4' | 'class_c_u1_5' | 'class_c_u1_6' | 'class_c_u1_7' |
+  'class_c_u2_1' | 'class_c_u2_2' | 'class_c_u2_3' | 'class_c_u2_4' | 'class_c_u2_5' | 'class_c_u2_6' | 'class_c_u2_7';
 
 export interface PinLabels {
   0?: string; // Top / Pin 1

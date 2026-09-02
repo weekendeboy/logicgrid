@@ -18,6 +18,22 @@ import {
 import { Navbar } from './components/Navbar';
 import { LeftSidebar } from './components/LeftSidebar';
 import { RightSidebar } from './components/RightSidebar';
+import classCU17 from './levels/class_c_u1_7.json';
+import classCU11 from './levels/class_c_u1_1.json';
+import classCU12 from './levels/class_c_u1_2.json';
+import classCU13 from './levels/class_c_u1_3.json';
+import classCU23 from './levels/class_c_u2_3.json';
+
+import classCU14 from './levels/class_c_u1_4.json';
+import classCU15 from './levels/class_c_u1_5.json';
+import classCU16 from './levels/class_c_u1_6.json';
+import classCU21 from './levels/class_c_u2_1.json';
+import classCU22 from './levels/class_c_u2_2.json';
+import classCU24 from './levels/class_c_u2_4.json';
+import classCU25 from './levels/class_c_u2_5.json';
+import classCU26 from './levels/class_c_u2_6.json';
+import classCU27 from './levels/class_c_u2_7.json';
+
 import { CanvasWorkspace } from './components/CanvasWorkspace';
 import { Modals } from './components/Modals';
 import { findAStarPath, layWiresOnPath } from './engine/Pathfinding';
@@ -799,6 +815,118 @@ export default function App() {
           const mcb1 = new Tile('breaker', 'mcb'); mcb1.rotation = 0; mcb1.isLocked = true;
           const mcb2 = new Tile('breaker', 'mcb'); mcb2.rotation = 0; mcb2.isLocked = true;
           newGrid[5][9] = mcb1; newGrid[5][10] = mcb2;
+        } else if (level === 'class_c_u1_7' && classCU17 && classCU17.grid) {
+          for (let y = 0; y < Math.min(size, classCU17.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU17.grid[y].length); x++) {
+              if (classCU17.grid[y] && classCU17.grid[y][x]) {
+                newGrid[y][x] = Object.assign(new Tile(), classCU17.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u1_1' && classCU11 && classCU11.grid) {
+          for (let y = 0; y < Math.min(size, classCU11.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU11.grid[y].length); x++) {
+              if (classCU11.grid[y] && classCU11.grid[y][x]) {
+                newGrid[y][x] = Object.assign(new Tile(), classCU11.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u1_2' && classCU12 && classCU12.grid) {
+          for (let y = 0; y < Math.min(size, classCU12.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU12.grid[y].length); x++) {
+              if (classCU12.grid[y] && classCU12.grid[y][x]) {
+                newGrid[y][x] = Object.assign(new Tile(), classCU12.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u1_3' && classCU13 && classCU13.grid) {
+          for (let y = 0; y < Math.min(size, classCU13.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU13.grid[y].length); x++) {
+              if (classCU13.grid[y] && classCU13.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU13.grid[y][x]);
+              }
+            }
+          }
+                } else if (level === 'class_c_u1_4' && classCU14 && classCU14.grid) {
+          for (let y = 0; y < Math.min(size, classCU14.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU14.grid[y].length); x++) {
+              if (classCU14.grid[y] && classCU14.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU14.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u1_5' && classCU15 && classCU15.grid) {
+          for (let y = 0; y < Math.min(size, classCU15.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU15.grid[y].length); x++) {
+              if (classCU15.grid[y] && classCU15.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU15.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u1_6' && classCU16 && classCU16.grid) {
+          for (let y = 0; y < Math.min(size, classCU16.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU16.grid[y].length); x++) {
+              if (classCU16.grid[y] && classCU16.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU16.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_1' && classCU21 && classCU21.grid) {
+          for (let y = 0; y < Math.min(size, classCU21.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU21.grid[y].length); x++) {
+              if (classCU21.grid[y] && classCU21.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU21.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_2' && classCU22 && classCU22.grid) {
+          for (let y = 0; y < Math.min(size, classCU22.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU22.grid[y].length); x++) {
+              if (classCU22.grid[y] && classCU22.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU22.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_4' && classCU24 && classCU24.grid) {
+          for (let y = 0; y < Math.min(size, classCU24.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU24.grid[y].length); x++) {
+              if (classCU24.grid[y] && classCU24.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU24.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_5' && classCU25 && classCU25.grid) {
+          for (let y = 0; y < Math.min(size, classCU25.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU25.grid[y].length); x++) {
+              if (classCU25.grid[y] && classCU25.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU25.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_6' && classCU26 && classCU26.grid) {
+          for (let y = 0; y < Math.min(size, classCU26.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU26.grid[y].length); x++) {
+              if (classCU26.grid[y] && classCU26.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU26.grid[y][x]);
+              }
+            }
+          }
+        } else if (level === 'class_c_u2_7' && classCU27 && classCU27.grid) {
+          for (let y = 0; y < Math.min(size, classCU27.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU27.grid[y].length); x++) {
+              if (classCU27.grid[y] && classCU27.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU27.grid[y][x]);
+              }
+            }
+          }
+} else if (level === 'class_c_u2_3' && classCU23 && classCU23.grid) {
+          for (let y = 0; y < Math.min(size, classCU23.grid.length); y++) {
+            for (let x = 0; x < Math.min(size, classCU23.grid[y].length); x++) {
+              if (classCU23.grid[y] && classCU23.grid[y][x]) { 
+                newGrid[y][x] = Object.assign(new Tile(), classCU23.grid[y][x]);
+              }
+            }
+          }
         }
       }
 
@@ -913,6 +1041,7 @@ export default function App() {
       if (levelId.startsWith('5-')) sz = 20;
       if (levelId.startsWith('w-')) sz = 15;
       if (levelId === 'w-1-1' || levelId === 'w-1-2' || levelId === 'w-1-3' || levelId === 'w-1-4' || levelId === 'w-2-1' || levelId === 'w-2-2' || levelId === 'w-2-3' || levelId === 'w-2-4' || levelId === 'w-3-1' || levelId === 'w-3-2' || levelId === 'w-3-3' || levelId === 'w-4-1' || levelId === 'w-4-2') sz = 10;
+      if (levelId === 'class_c_u1_7' || levelId === 'class_c_u1_1' || levelId === 'class_c_u1_2' || levelId.startsWith('class_c_')) sz = 60;
       setGridSize(sz);
       handleClearCanvas(false, undefined, levelId, sz);
     }
