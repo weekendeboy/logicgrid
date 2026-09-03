@@ -5432,7 +5432,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       ) : (
         <div className="min-w-full min-h-full w-max h-max flex items-center justify-center p-8 relative">
           {/* Tutorial Banner */}
-          {(currentMode === 'tutorial' || currentMode === 'logic' || currentMode === 'wiring') && logicLevel && logicLevel !== 'sandbox' && logicLevel !== 'wiring-menu' && (
+          {(currentMode === 'tutorial' || currentMode === 'logic' || currentMode === 'wiring') && logicLevel && logicLevel !== 'sandbox' && logicLevel !== 'wiring-menu' && !logicLevel.startsWith('class_c_') && (
             <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border-2 border-yellow-500 text-white px-6 py-3.5 rounded-xl shadow-2xl z-20 text-center min-w-[320px]">
               <h2 className="text-base font-bold text-yellow-400 mb-0.5">{tutorialTitle}</h2>
               <p className="text-xs text-slate-300 mb-3">{tutorialDesc}</p>
