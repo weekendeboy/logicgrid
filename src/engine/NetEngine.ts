@@ -79,6 +79,14 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
       } else if (t.type === 'protection' && (t.subtype === 'ol_2p' || t.subtype === 'ol_3p')) {
         // Break the main circuit when OL is tripped (active)
         groups = t.isActive ? [[0], [2]] : [[0, 2]];
+      } else if (t.type === 'protection' && t.subtype === 'converter') {
+        if (t.state === 3) {
+          groups = [[0], [2]];
+        } else {
+          groups = [[0, 2]];
+        }
+      } else if (t.type === 'protection' && t.subtype === '3e_relay') {
+        groups = [[0], [2]];
       } else if (t.type === 'terminal') {
         groups = [[2]];
       } else if (t.type === 'motor') {
@@ -150,6 +158,26 @@ export function buildNetState(
   faults: Faults
 ): { netMap: number[][][]; netCount: number } {
   const ds = new DisjointSet();
+
+  // Auto-correct converter state to avoid loading/saving issues
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const t = grid[y][x];
+      if (t && t.type === 'protection' && t.subtype === 'converter') {
+        const isLeftmost = x === 0 || grid[y][x - 1]?.groupId !== t.groupId;
+        if (isLeftmost && x + 3 < w) {
+          if (grid[y][x + 1]?.groupId === t.groupId &&
+              grid[y][x + 2]?.groupId === t.groupId &&
+              grid[y][x + 3]?.groupId === t.groupId) {
+            t.state = 0;
+            grid[y][x + 1]!.state = 1;
+            grid[y][x + 2]!.state = 2;
+            grid[y][x + 3]!.state = 3;
+          }
+        }
+      }
+    }
+  }
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {

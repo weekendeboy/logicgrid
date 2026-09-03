@@ -32,6 +32,8 @@ import {
 
 interface RightSidebarProps {
   currentMode: AppMode;
+  plcSubTab: 'wiring' | 'ladder';
+  setPlcSubTab: (tab: 'wiring' | 'ladder') => void;
   currentTool: ToolType;
   meterChannel: string;
   oscVal: number | null;
@@ -100,6 +102,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   isPinned,
   onTogglePin,
   onClose,
+  plcSubTab,
+  setPlcSubTab,
   onSetTool,
   onSetMeterChannel,
   onSetPlacement,
@@ -116,8 +120,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpanded = (key: string) => setExpanded(prev => ({ ...prev, [key]: prev[key] === false ? true : false }));
-  const [plcSubTab, setPlcSubTab] = React.useState<'wiring' | 'ladder'>('ladder');
-  const oscCanvasRef = useRef<HTMLCanvasElement>(null);
+    const oscCanvasRef = useRef<HTMLCanvasElement>(null);
   const oscBufferRef = useRef<number[]>(Array(130).fill(0));
 
   const isPlacementSelected = (typeStr: string) => {
@@ -964,6 +967,31 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <path d="M 10 40 L 70 40" stroke="#f87171" strokeWidth="2" strokeDasharray="3 3" />
                 </svg>
                 OL 3P
+              </button>
+              <button
+                className={`${isPlacementSelected('protection_3e_relay') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('protection_3e_relay')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="15" y="25" width="50" height="30" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <text x="40" y="45" fill="#f87171" fontSize="12" fontFamily="Arial" textAnchor="middle" fontWeight="bold">3E</text>
+                  <path d="M 25 10 L 25 25 M 40 10 L 40 25 M 55 10 L 55 25" fill="none" stroke="#f87171" strokeWidth="2" />
+                  <path d="M 25 55 L 25 70 M 40 55 L 40 70" fill="none" stroke="#f87171" strokeWidth="2" />
+                </svg>
+                3E Relay
+              </button>
+              <button
+                className={`${isPlacementSelected('protection_converter') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}
+                onClick={() => onSetPlacement('protection_converter')}
+              >
+                <svg width="32" height="32" viewBox="0 0 80 80" className="wire-svg shrink-0">
+                  <rect x="5" y="30" width="70" height="20" fill="#0f172a" stroke="#f59e0b" strokeWidth="2" />
+                  <text x="35" y="44" fill="#f59e0b" fontSize="8" fontFamily="Arial" textAnchor="middle" fontWeight="bold">CONV</text>
+                  <text x="65" y="25" fill="#f59e0b" fontSize="12" fontFamily="Arial" textAnchor="middle" fontWeight="bold">+</text>
+                  <text x="65" y="65" fill="#f59e0b" fontSize="12" fontFamily="Arial" textAnchor="middle" fontWeight="bold">-</text>
+                  <path d="M 15 10 L 15 70 M 35 10 L 35 70 M 55 10 L 55 70" fill="none" stroke="#f59e0b" strokeWidth="2" />
+                </svg>
+                CONVERTER
               </button>
               <button
                 className={`${isPlacementSelected('power_3phase') ? 'bg-blue-600/30 border-blue-500' : 'bg-slate-800 hover:bg-slate-700 border-slate-700'} p-2  rounded-lg text-xs text-slate-200 flex items-center gap-1.5`}

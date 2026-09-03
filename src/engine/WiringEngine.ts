@@ -108,21 +108,21 @@ export const WiringEngine = {
       for (let x = 0; x < grid[0].length; x++) {
         const t = grid[y][x];
         if (t && t.type === 'wire') {
-          if (t.subtype === 'l' || t.subtype === 'h') lNets.add(netMap[y][x][(2 + t.rotation) % 4]);
-          if (t.subtype === 'n' || t.subtype === 'g') nNets.add(netMap[y][x][(2 + t.rotation) % 4]);
-          if (t.subtype === 'plus') plus24VNets.add(netMap[y][x][(2 + t.rotation) % 4]);
-          if (t.subtype === 'minus' || t.subtype === 'ground') zeroVNets.add(netMap[y][x][(2 + t.rotation) % 4]);
+          if (t.subtype === 'l' || t.subtype === 'h') lNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]);
+          if (t.subtype === 'n' || t.subtype === 'g') nNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]);
+          if (t.subtype === 'plus') plus24VNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]);
+          if (t.subtype === 'minus' || t.subtype === 'ground') zeroVNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]);
         }
         if (t && t.type === 'power' && (t.subtype === '3phase_r' || t.subtype === '3phase_s' || t.subtype === '3phase_t')) {
-          const net = netMap[y][x][(2 + t.rotation) % 4];
+          const net = netMap[y]?.[x]?.[(2 + t.rotation) % 4];
           lNets.add(net);
           if (t.subtype === '3phase_r') rNets.add(net);
           if (t.subtype === '3phase_s') sNets.add(net);
           if (t.subtype === '3phase_t') tNets.add(net);
         }
         if (t && t.type === 'power' && t.subtype === 'dc24') {
-          plus24VNets.add(netMap[y][x][(0 + t.rotation) % 4]); // top
-          zeroVNets.add(netMap[y][x][(2 + t.rotation) % 4]); // bottom
+          plus24VNets.add(netMap[y]?.[x]?.[(0 + t.rotation) % 4]); // top
+          zeroVNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]); // bottom
         }
         if (t && t.type === 'power' && t.subtype === 'psu_left') {
           let rx = x, ry = y;
@@ -132,27 +132,27 @@ export const WiringEngine = {
           else if (t.rotation === 3) ry = y - 1;
           const rightTile = (ry >= 0 && ry < grid.length && rx >= 0 && rx < grid[0].length) ? grid[ry][rx] : null;
           if (rightTile && rightTile.type === 'power' && rightTile.subtype === 'psu_right' && rightTile.groupId === t.groupId) {
-            const lNet = netMap[y][x][(0 + t.rotation) % 4];
-            const nNet = netMap[ry][rx][(0 + rightTile.rotation) % 4];
+            const lNet = netMap[y]?.[x]?.[(0 + t.rotation) % 4];
+            const nNet = netMap[ry]?.[rx]?.[(0 + rightTile.rotation) % 4];
             const isPowered = lNet > 0 && nNet > 0 && lNet !== nNet && lNets.has(lNet) && nNets.has(nNet);
             t.isPowered = isPowered;
             rightTile.isPowered = isPowered;
             if (isPowered) {
-              const p24Net = netMap[y][x][(2 + t.rotation) % 4];
-              const z0Net = netMap[ry][rx][(2 + rightTile.rotation) % 4];
+              const p24Net = netMap[y]?.[x]?.[(2 + t.rotation) % 4];
+              const z0Net = netMap[ry]?.[rx]?.[(2 + rightTile.rotation) % 4];
               if (p24Net > 0) plus24VNets.add(p24Net);
               if (z0Net > 0) zeroVNets.add(z0Net);
             }
           }
         }
         if (t && t.type === 'pneumatic' && t.subtype === 'air_source') {
-          airNets.add(netMap[y][x][(2 + t.rotation) % 4]);
+          airNets.add(netMap[y]?.[x]?.[(2 + t.rotation) % 4]);
         }
         if (t && t.type === 'plc' && t.subtype === 'unit' && t.dx === 0 && t.dy === 0) {
           // L terminal is at (x + 1, y), top pin (0)
           // N terminal is at (x + 2, y), top pin (0)
-          const lNet = netMap[y][x + 1][0];
-          const nNet = netMap[y][x + 2][0];
+          const lNet = netMap[y]?.[x + 1]?.[0];
+          const nNet = netMap[y]?.[x + 2]?.[0];
 
           const isPowered =
             lNet > 0 &&
@@ -166,8 +166,8 @@ export const WiringEngine = {
           if (isPowered) {
             // +24V terminal is at (x + 1, y + 9), bottom pin (2)
             // 0V terminal is at (x + 2, y + 9), bottom pin (2)
-            const p24Net = netMap[y + 9][x + 1][2];
-            const z0Net = netMap[y + 9][x + 2][2];
+            const p24Net = netMap[y + 9]?.[x + 1]?.[2];
+            const z0Net = netMap[y + 9]?.[x + 2]?.[2];
 
             if (p24Net > 0) plus24VNets.add(p24Net);
             if (z0Net > 0) zeroVNets.add(z0Net);
@@ -175,6 +175,52 @@ export const WiringEngine = {
         }
       }
     }
+
+    const converterSequences: string[] = [];
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[0].length; x++) {
+        const t = grid[y][x];
+        if (t && t.type === 'protection' && t.subtype === 'converter') {
+          const isLeft = x + 1 < grid[0].length && grid[y]?.[x + 1]?.groupId === t.groupId && (x === 0 || grid[y]?.[x - 1]?.groupId !== t.groupId);
+          if (isLeft && x + 3 < grid[0].length) {
+            const p1 = netMap[y]?.[x]?.[0];
+            const p2 = netMap[y]?.[x + 1]?.[0];
+            const p3 = netMap[y]?.[x + 2]?.[0];
+            const getPh = (net: number) => {
+              if (rNets.has(net)) return 1;
+              if (sNets.has(net)) return 2;
+              if (tNets.has(net)) return 3;
+              return 0;
+            };
+            const ph1 = getPh(p1);
+            const ph2 = getPh(p2);
+            const ph3 = getPh(p3);
+            if (ph1 !== 0 && ph2 !== 0 && ph3 !== 0) {
+              const seq = `${ph1}${ph2}${ph3}`;
+              converterSequences.push(seq);
+              
+              const isForward = (seq === '123' || seq === '231' || seq === '312');
+              const hasMissingPhase = ph1 === ph2 || ph2 === ph3 || ph1 === ph3;
+              
+              const isValid = isForward && !hasMissingPhase;
+              t.isActive = isValid;
+              grid[y][x + 1]!.isActive = isValid;
+              grid[y][x + 2]!.isActive = isValid;
+              grid[y][x + 3]!.isActive = isValid;
+
+              if (isValid) {
+                const outPlus = netMap[y]?.[x + 3]?.[0];
+                const outMinus = netMap[y]?.[x + 3]?.[2];
+                if (outPlus !== undefined && outPlus > 0) plus24VNets.add(outPlus);
+                console.log("Converter outPlus:", outPlus, "outMinus:", outMinus);
+                if (outMinus !== undefined && outMinus > 0) zeroVNets.add(outMinus);
+              }
+            }
+          }
+        }
+      }
+    }
+
 
     let isAirElecMixed = false;
     for (let i = 1; i < netData.length; i++) {
@@ -214,6 +260,15 @@ export const WiringEngine = {
       }
     }
 
+    lNets.delete(0);
+    nNets.delete(0);
+    plus24VNets.delete(0);
+    zeroVNets.delete(0);
+    airNets.delete(0);
+    rNets.delete(0);
+    sNets.delete(0);
+    tNets.delete(0);
+
     const shortedNets = new Set([
       ...[...lNets].filter((x) => nNets.has(x)),
       ...[...plus24VNets].filter((x) => zeroVNets.has(x)),
@@ -221,13 +276,27 @@ export const WiringEngine = {
       ...[...sNets].filter((x) => rNets.has(x) || tNets.has(x)),
       ...[...tNets].filter((x) => rNets.has(x) || sNets.has(x))
     ]);
+    
+    if (shortedNets.size > 0) {
+      console.log("SHORTED NETS:", shortedNets);
+      console.log("rNets:", rNets, "sNets:", sNets, "tNets:", tNets, "lNets:", lNets, "nNets:", nNets, "plus24VNets:", plus24VNets, "zeroVNets:", zeroVNets);
+      
+      const ln = [...lNets].filter((x) => nNets.has(x));
+      const pz = [...plus24VNets].filter((x) => zeroVNets.has(x));
+      const rs = [...rNets].filter((x) => sNets.has(x) || tNets.has(x));
+      const sr = [...sNets].filter((x) => rNets.has(x) || tNets.has(x));
+      const tr = [...tNets].filter((x) => rNets.has(x) || sNets.has(x));
+      
+      console.log("Short sources:", {ln, pz, rs, sr, tr});
+    }
+
     if (shortedNets.size > 0 || isAirElecMixed) {
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < grid[0].length; x++) {
           const t = grid[y][x];
           if (t && t.type === 'protection' && t.subtype === 'fuse' && !t.isBlown) {
-            const p0 = netMap[y][x][(0 + t.rotation) % 4];
-            const p2 = netMap[y][x][(2 + t.rotation) % 4];
+            const p0 = netMap[y]?.[x]?.[(0 + t.rotation) % 4];
+            const p2 = netMap[y]?.[x]?.[(2 + t.rotation) % 4];
             if (shortedNets.has(p0) || shortedNets.has(p2) || isAirElecMixed) {
               t.isBlown = true;
             }
@@ -244,12 +313,12 @@ export const WiringEngine = {
         const t = grid[y][x];
 
         if (t && (t.type === 'relay' || (t.type === 'pneumatic' && t.subtype === 'valve_coil'))) {
-          let p1 = netMap[y][x][(0 + t.rotation) % 4];
-          let p2 = netMap[y][x][(2 + t.rotation) % 4];
+          let p1 = netMap[y]?.[x]?.[(0 + t.rotation) % 4];
+          let p2 = netMap[y]?.[x]?.[(2 + t.rotation) % 4];
           
           if (t.subtype === 'counter_coil') {
-            p1 = netMap[y][x][(3 + t.rotation) % 4];
-            p2 = netMap[y][x][(1 + t.rotation) % 4];
+            p1 = netMap[y]?.[x]?.[(3 + t.rotation) % 4];
+            p2 = netMap[y]?.[x]?.[(1 + t.rotation) % 4];
           }
 
           const pAPhases = (rNets.has(p1) ? 1 : 0) | (sNets.has(p1) ? 2 : 0) | (tNets.has(p1) ? 4 : 0);
@@ -268,7 +337,7 @@ export const WiringEngine = {
             
           let isResetPowered = false;
           if (t.subtype === 'impulse_coil') {
-            const p3 = netMap[y][x][(3 + t.rotation) % 4];
+            const p3 = netMap[y]?.[x]?.[(3 + t.rotation) % 4];
             isResetPowered = (
               ((lNets.has(p3) && nNets.has(p2)) || (lNets.has(p2) && nNets.has(p3)) ||
                (plus24VNets.has(p3) && zeroVNets.has(p2)) || (plus24VNets.has(p2) && zeroVNets.has(p3))) ||
@@ -276,7 +345,7 @@ export const WiringEngine = {
                (plus24VNets.has(p3) && zeroVNets.has(p1)) || (plus24VNets.has(p1) && zeroVNets.has(p3)))
             ) && !shortedNets.has(p3) && !isAirElecMixed;
           } else if (t.subtype === 'counter_coil') {
-            const p0 = netMap[y][x][(0 + t.rotation) % 4];
+            const p0 = netMap[y]?.[x]?.[(0 + t.rotation) % 4];
             isResetPowered = (
               ((lNets.has(p0) && nNets.has(p2)) || (lNets.has(p2) && nNets.has(p0)) ||
                (plus24VNets.has(p0) && zeroVNets.has(p2)) || (plus24VNets.has(p2) && zeroVNets.has(p0))) ||
@@ -374,9 +443,9 @@ export const WiringEngine = {
         if (t && (t.type === 'load' || t.type === 'motor')) {
           if (t.type === 'motor' && t.subtype === '3phase') {
             const rot = t.rotation || 0;
-            const pU_net = netMap[y][x][(0 + rot) % 4];
-            const pV_net = netMap[y][x][(3 + rot) % 4];
-            const pW_net = netMap[y][x][(2 + rot) % 4];
+            const pU_net = netMap[y]?.[x]?.[(0 + rot) % 4];
+            const pV_net = netMap[y]?.[x]?.[(3 + rot) % 4];
+            const pW_net = netMap[y]?.[x]?.[(2 + rot) % 4];
 
             const getPhase = (net: number) => {
               if (rNets.has(net)) return 1;
@@ -404,8 +473,8 @@ export const WiringEngine = {
             t.isPowered = isPowered;
             t.motorDir = mDir;
           } else {
-            const p0 = netMap[y][x][(0 + t.rotation) % 4];
-            const p2 = netMap[y][x][(2 + t.rotation) % 4];
+            const p0 = netMap[y]?.[x]?.[(0 + t.rotation) % 4];
+            const p2 = netMap[y]?.[x]?.[(2 + t.rotation) % 4];
             
             const pAPhases = (rNets.has(p0) ? 1 : 0) | (sNets.has(p0) ? 2 : 0) | (tNets.has(p0) ? 4 : 0);
             const pBPhases = (rNets.has(p2) ? 1 : 0) | (sNets.has(p2) ? 2 : 0) | (tNets.has(p2) ? 4 : 0);
@@ -438,7 +507,7 @@ export const WiringEngine = {
           const topX = x + [0, 2, 0, -2][rot];
           const topY = y + [-2, 0, 2, 0][rot];
 
-          const pExt = netMap[y][x][(3 + rot) % 4];
+          const pExt = netMap[y]?.[x]?.[(3 + rot) % 4];
           const hasExtAir = airNets.has(pExt) && !isAirElecMixed;
 
           let hasRetAir = false;
@@ -450,7 +519,7 @@ export const WiringEngine = {
             topY < grid.length &&
             grid[topY][topX]
           ) {
-            const pRet = netMap[topY][topX][(3 + rot) % 4];
+            const pRet = netMap[topY]?.[topX]?.[(3 + rot) % 4];
             hasRetAir = airNets.has(pRet) && !isAirElecMixed;
           }
 
@@ -520,10 +589,9 @@ export const WiringEngine = {
     }
 
     // PLC Ladder Diagram Power Rail & Coil Evaluation
-    const splitCol = grid[0].length <= 10 ? 5 : 10;
     for (let y = 0; y < grid.length; y++) {
       if (grid[y] && grid[y][0]) {
-        const railNet = netMap[y][0][3]; // left pin at col 0
+        const railNet = netMap[y]?.[0]?.[3]; // left pin at col 0
         if (railNet > 0) {
           lNets.add(railNet);
         }
@@ -540,7 +608,7 @@ export const WiringEngine = {
 
           if (t.isPowered) {
             // S/S terminal is at (x, y + 9), left pin (3)
-            const ssNet = netMap[y + 9][x][3];
+            const ssNet = netMap[y + 9]?.[x]?.[3];
             const isSSPlus24V = ssNet > 0 && (plus24VNets.has(ssNet) || lNets.has(ssNet));
             const isSSZeroV = ssNet > 0 && (zeroVNets.has(ssNet) || nNets.has(ssNet));
 
@@ -549,7 +617,7 @@ export const WiringEngine = {
               const ix = x;
               const iy = y + 1 + i;
               if (iy < grid.length) {
-                const xNet = netMap[iy][ix][3];
+                const xNet = netMap[iy]?.[ix]?.[3];
                 let isInputTriggered = false;
 
                 if (isSSPlus24V) {
@@ -576,6 +644,73 @@ export const WiringEngine = {
       }
     }
 
+    // Evaluate 3E Relays
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[0].length; x++) {
+        const t = grid[y][x];
+        if (t && t.type === 'protection' && t.subtype === '3e_relay') {
+          const isLeft = x + 1 < grid[0].length && grid[y]?.[x + 1]?.groupId === t.groupId && (x === 0 || grid[y]?.[x - 1]?.groupId !== t.groupId);
+          if (isLeft && x + 2 < grid[0].length) {
+            const t2 = grid[y]?.[x + 1];
+            const t3 = grid[y]?.[x + 2];
+            const r1 = t.rotation || 0;
+            const r2 = t2?.rotation || 0;
+            const r3 = t3?.rotation || 0;
+
+            const p1 = netMap[y]?.[x]?.[(0 + r1) % 4];
+            const p2 = netMap[y]?.[x + 1]?.[(0 + r2) % 4];
+            const p3 = netMap[y]?.[x + 2]?.[(0 + r3) % 4];
+            
+            // C+ and C- are on pins 2 of left and middle tiles
+            const cPlus = netMap[y]?.[x]?.[(2 + r1) % 4];
+            const cMinus = netMap[y]?.[x + 1]?.[(2 + r2) % 4];
+
+            const getPh = (net: number) => {
+              if (rNets.has(net)) return 1;
+              if (sNets.has(net)) return 2;
+              if (tNets.has(net)) return 3;
+              return 0;
+            };
+            const ph1 = getPh(p1);
+            const ph2 = getPh(p2);
+            const ph3 = getPh(p3);
+            const seq = `${ph1}${ph2}${ph3}`;
+
+            const isForwardPhase = seq === '123' || seq === '231' || seq === '312';
+            
+            const pAPhases = (rNets.has(cPlus) ? 1 : 0) | (sNets.has(cPlus) ? 2 : 0) | (tNets.has(cPlus) ? 4 : 0);
+            const pBPhases = (rNets.has(cMinus) ? 1 : 0) | (sNets.has(cMinus) ? 2 : 0) | (tNets.has(cMinus) ? 4 : 0);
+            const hasPhaseToPhase = pAPhases > 0 && pBPhases > 0 && pAPhases !== pBPhases;
+
+            const hasL = lNets.has(cPlus) || lNets.has(cMinus) || plus24VNets.has(cPlus) || plus24VNets.has(cMinus);
+            const hasN = nNets.has(cPlus) || nNets.has(cMinus) || zeroVNets.has(cPlus) || zeroVNets.has(cMinus);
+            const isPowerOk = ((hasL && hasN) || hasPhaseToPhase) && cPlus > 0 && cMinus > 0 && !shortedNets.has(cPlus) && !shortedNets.has(cMinus) && !isAirElecMixed;
+
+            const hasMissingPhase = ph1 === ph2 || ph2 === ph3 || ph1 === ph3;
+            
+            let coilOn = false;
+            if (isPowerOk && !hasMissingPhase && isForwardPhase && converterSequences.includes(seq)) {
+              coilOn = true;
+            }
+
+            t.isActive = coilOn;
+            if (t2) t2.isActive = coilOn;
+            if (t3) t3.isActive = coilOn;
+
+            if (coilOn) {
+              [t, t2, t3].forEach(tile => {
+                if (tile && tile.labels && tile.labels[4]) {
+                  const raw = tile.labels[4];
+                  activeContacts.add(raw);
+                  activeContacts.add(raw.trim().toUpperCase());
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+
     // Evaluate Overload Relays (OL)
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[0].length; x++) {
@@ -595,7 +730,7 @@ export const WiringEngine = {
       for (let x = 0; x < grid[0].length; x++) {
         const t = grid[y][x];
         if (t && t.type === 'plc' && (t.subtype === 'out' || t.subtype === 'plc_out')) {
-          const p3 = netMap[y][x][(3 + t.rotation) % 4];
+          const p3 = netMap[y]?.[x]?.[(3 + t.rotation) % 4];
           if (lNets.has(p3) && !shortedNets.has(p3)) {
             t.isPowered = true;
             if (t.labels && t.labels[4]) {
@@ -617,7 +752,7 @@ export const WiringEngine = {
           const rot = t.rotation || 0;
           if (t.subtype === 'valve_52' || t.subtype === 'valve_52_double') {
             const pPort = (2 + rot) % 4;
-            t.isPowered = airNets.has(netMap[y][x][pPort]);
+            t.isPowered = airNets.has(netMap[y]?.[x]?.[pPort]);
           } else if (t.subtype === 'valve_52_a_r') {
             const dx = [1, 0, -1, 0][rot];
             const dy = [0, 1, 0, -1][rot];

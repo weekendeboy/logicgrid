@@ -41,7 +41,10 @@ import { findAStarPath, layWiresOnPath } from './engine/Pathfinding';
 export default function App() {
   const [currentMode, setCurrentMode] = useState<AppMode>('tutorial');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [gridSize, setGridSize] = useState<number>(60);
+  const [wiringGridSize, setWiringGridSize] = useState<number>(60);
+  const [ladderGridSize, setLadderGridSize] = useState<number>(60);
+  const [plcSubTab, setPlcSubTab] = useState<'wiring' | 'ladder'>('wiring');
+  const activeGridSize = (currentMode === 'plc' && plcSubTab === 'ladder') ? ladderGridSize : wiringGridSize;
   const [zoom, setZoom] = useState<number>(1.0);
   const [subMode, setSubMode] = useState<SubMode>('sandbox');
   const [logicLevel, setLogicLevel] = useState<LogicLevelId>('sandbox');
@@ -67,6 +70,11 @@ export default function App() {
       .fill(null)
       .map(() => Array(60).fill(null))
   );
+  const [ladderGrid, setLadderGrid] = useState<(Tile | null)[][]>(() =>
+    Array(60)
+      .fill(null)
+      .map(() => Array(60).fill(null))
+  );
 
   const [autowireWaypoints, setAutowireWaypoints] = useState<Waypoint[]>([]);
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
@@ -74,7 +82,7 @@ export default function App() {
   const hasSelection = !!selectionBounds;
 
   // Undo History
-  const historyStackRef = useRef<{ grid: (Tile | null)[][]; faults: Faults }[]>([]);
+  const historyStackRef = useRef<{ grid: (Tile | null)[][]; ladderGrid: (Tile | null)[][]; faults: Faults; wSize: number; lSize: number }[]>([]);
 
   // Alert Toast
   const [alertToast, setAlertToast] = useState<string | null>(null);
@@ -142,12 +150,15 @@ export default function App() {
     if (historyStackRef.current.length >= 30) {
       historyStackRef.current.shift();
     }
+    const ladderGridCopy = ladderGrid.map((row) =>
+      row.map((tile) => (tile ? Object.assign(new Tile(), JSON.parse(JSON.stringify(tile))) : null))
+    );
     const gridCopy = grid.map((row) =>
       row.map((tile) => (tile ? Object.assign(new Tile(), JSON.parse(JSON.stringify(tile))) : null))
     );
     const faultsCopy = JSON.parse(JSON.stringify(faults));
-    historyStackRef.current.push({ grid: gridCopy, faults: faultsCopy });
-  }, [grid, faults]);
+    historyStackRef.current.push({ grid: gridCopy, ladderGrid: ladderGridCopy, faults: faultsCopy, wSize: wiringGridSize, lSize: ladderGridSize });
+  }, [grid, ladderGrid, faults, wiringGridSize, ladderGridSize]);
 
   // Undo
   const handleUndo = useCallback(() => {
@@ -158,7 +169,14 @@ export default function App() {
           row.map((tile) => (tile ? Object.assign(new Tile(), tile) : null))
         )
       );
+      setLadderGrid(
+        (state.ladderGrid || Array(ladderGridSize).fill(null).map(() => Array(ladderGridSize).fill(null))).map((row) =>
+          row.map((tile) => (tile ? Object.assign(new Tile(), tile) : null))
+        )
+      );
       setFaults(state.faults);
+      if (state.wSize) setWiringGridSize(state.wSize);
+      if (state.lSize) setLadderGridSize(state.lSize);
       showAlert('🔄 已復原上一步驟');
     } else {
       showAlert('⚠️ 沒有可以復原的步驟了');
@@ -170,39 +188,41 @@ export default function App() {
     (forceSandbox: boolean = false, overrideMode?: AppMode, overrideLevel?: LogicLevelId, overrideGridSize?: number) => {
       const mode = overrideMode || currentMode;
       const level = overrideLevel || logicLevel;
-      const size = overrideGridSize || gridSize;
+      const size = overrideGridSize || activeGridSize;
       const newGrid = Array(size)
+        .fill(null)
+        .map(() => Array(size).fill(null));
+      const newLadderGrid = Array(size)
         .fill(null)
         .map(() => Array(size).fill(null));
 
       if (mode === 'plc') {
-        const splitCol = size <= 10 ? 5 : 10;
-        const lastLadderCol = splitCol - 1;
+        const lastLadderCol = size - 1; // Put rails on left/right ends of the 60x60 ladder grid
 
         // Column 0: H at (0, 0), T-wires facing right below
         const tileH = new Tile('wire', 'h');
         tileH.rotation = 0;
         tileH.isLocked = true;
-        newGrid[0][0] = tileH;
+        newLadderGrid[0][0] = tileH;
 
         for (let y = 1; y < size; y++) {
           const tileT = new Tile('wire', 't');
           tileT.rotation = 3;
           tileT.isLocked = true;
-          newGrid[y][0] = tileT;
+          newLadderGrid[y][0] = tileT;
         }
 
         // Last column of ladder area: G at (lastLadderCol, 0), T-wires facing left below
         const tileG = new Tile('wire', 'g');
         tileG.rotation = 0;
         tileG.isLocked = true;
-        newGrid[0][lastLadderCol] = tileG;
+        newLadderGrid[0][lastLadderCol] = tileG;
 
         for (let y = 1; y < size; y++) {
           const tileT = new Tile('wire', 't');
           tileT.rotation = 1;
           tileT.isLocked = true;
-          newGrid[y][lastLadderCol] = tileT;
+          newLadderGrid[y][lastLadderCol] = tileT;
         }
       } else if (!forceSandbox && level && level !== 'sandbox') {
         if (level === '0-1') {
@@ -935,7 +955,7 @@ export default function App() {
       setSelectionBounds(null);
       setFaults({ opens: [], shorts: [] });
     },
-    [gridSize, logicLevel, currentMode]
+    [activeGridSize, logicLevel, currentMode]
   );
 
   const handleConfirmClearCanvas = useCallback(() => {
@@ -959,14 +979,16 @@ export default function App() {
     
     setLogicLevel(defaultLevel);
     setCurrentTool('interact');
-    setGridSize(newGridSize);
+    setWiringGridSize(newGridSize);
+    setLadderGridSize(newGridSize);
 
     handleClearCanvas(mode !== 'tutorial', mode, defaultLevel, newGridSize);
   };
 
   // Change Grid Size
   const handleChangeGridSize = (newSize: number) => {
-    setGridSize(newSize);
+    if (currentMode === 'plc' && plcSubTab === 'ladder') setLadderGridSize(newSize);
+    else setWiringGridSize(newSize);
     if (!isLeftPinned) {
       setIsLeftSidebarOpen(false);
     }
@@ -1042,7 +1064,8 @@ export default function App() {
       if (levelId.startsWith('w-')) sz = 15;
       if (levelId === 'w-1-1' || levelId === 'w-1-2' || levelId === 'w-1-3' || levelId === 'w-1-4' || levelId === 'w-2-1' || levelId === 'w-2-2' || levelId === 'w-2-3' || levelId === 'w-2-4' || levelId === 'w-3-1' || levelId === 'w-3-2' || levelId === 'w-3-3' || levelId === 'w-4-1' || levelId === 'w-4-2') sz = 10;
       if (levelId === 'class_c_u1_7' || levelId === 'class_c_u1_1' || levelId === 'class_c_u1_2' || levelId.startsWith('class_c_')) sz = 60;
-      setGridSize(sz);
+      if (currentMode === 'plc' && plcSubTab === 'ladder') setLadderGridSize(sz);
+      else setWiringGridSize(sz);
       handleClearCanvas(false, undefined, levelId, sz);
     }
   };
@@ -1106,8 +1129,8 @@ export default function App() {
         autowireWaypoints[i],
         autowireWaypoints[i + 1],
         grid,
-        gridSize,
-        gridSize
+        activeGridSize,
+        activeGridSize
       );
       if (path && path.length > 1) {
         if (fullPath.length > 0) path.shift();
@@ -1214,8 +1237,8 @@ export default function App() {
   const handleExportJSON = () => {
     const data = JSON.stringify({
       mode: currentMode,
-      width: gridSize,
-      height: gridSize,
+      width: activeGridSize,
+      height: activeGridSize,
       grid: grid,
     });
     const blob = new Blob([data], { type: 'application/json' });
@@ -1246,7 +1269,12 @@ export default function App() {
           }
           const targetSize =
             parsed.width || (parsed.grid && parsed.grid[0] ? parsed.grid[0].length : 60);
-          setGridSize(targetSize);
+          if (parsed.mode === 'plc') {
+            setWiringGridSize(targetSize);
+            setLadderGridSize(targetSize);
+          } else {
+            setWiringGridSize(targetSize);
+          }
 
           const newGrid = Array(targetSize)
             .fill(null)
@@ -1262,12 +1290,12 @@ export default function App() {
           setGrid(newGrid);
           showAlert('檔案讀取成功！');
         } else {
-          let minX = gridSize,
+          let minX = activeGridSize,
             maxX = -1,
-            minY = gridSize,
+            minY = activeGridSize,
             maxY = -1;
-          for (let y = 0; y < Math.min(gridSize, parsed.grid.length); y++) {
-            for (let x = 0; x < Math.min(gridSize, parsed.grid[y].length); x++) {
+          for (let y = 0; y < Math.min(activeGridSize, parsed.grid.length); y++) {
+            for (let x = 0; x < Math.min(activeGridSize, parsed.grid[y].length); x++) {
               if (parsed.grid[y] && parsed.grid[y][x]) {
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
@@ -1413,7 +1441,7 @@ export default function App() {
           {isLeftSidebarOpen && (
             <LeftSidebar
               currentMode={currentMode}
-              gridSize={gridSize}
+              gridSize={activeGridSize}
               zoom={zoom}
               subMode={subMode}
               logicLevel={logicLevel}
@@ -1440,8 +1468,11 @@ export default function App() {
 
         <CanvasWorkspace
           currentMode={currentMode}
+          plcSubTab={plcSubTab}
+          ladderGrid={ladderGrid}
+          setLadderGrid={setLadderGrid}
           currentTool={currentTool}
-          gridSize={gridSize}
+          gridSize={activeGridSize}
           zoom={zoom}
           isDarkMode={isDarkMode}
           grid={grid}
@@ -1484,6 +1515,8 @@ export default function App() {
           {isRightSidebarOpen && (
             <RightSidebar
               currentMode={currentMode}
+              plcSubTab={plcSubTab}
+              setPlcSubTab={setPlcSubTab}
               currentTool={currentTool}
               meterChannel={meterChannel}
               oscVal={meterValues.oscVal}
