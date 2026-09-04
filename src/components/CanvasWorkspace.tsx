@@ -434,7 +434,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Canvas Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === 'touch') {
+    let mPos = mousePos;
+    let mPosRaw = mousePosRaw;
+
+    if (e.pointerType === 'touch' || e.pointerType === 'mouse' || e.pointerType === 'pen') {
       const canvas = canvasRef.current;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -444,6 +447,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const rawY = (e.clientY - rect.top) * scaleY;
         const mx = Math.floor(rawX / TILE_SIZE);
         const my = Math.floor(rawY / TILE_SIZE);
+
+        mPosRaw = { x: rawX, y: rawY };
+        mPos = { x: mx, y: my };
 
         const isPlacementTool = 
           currentTool === 'place' || 
@@ -461,11 +467,16 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           setMousePos({ x: mx, y: my });
           return;
         }
+
+        // For non-placement tools, we just use the updated mPos immediately
+        // and also schedule a state update so it's correct for next render
+        setMousePosRaw({ x: rawX, y: rawY });
+        setMousePos({ x: mx, y: my });
       }
     }
 
     if (e.button === 2) return; // Right click handles rotation
-    if (mousePos.x < 0 || mousePos.x >= gridSize || mousePos.y < 0 || mousePos.y >= gridSize) return;
+    if (mPos.x < 0 || mPos.x >= gridSize || mPos.y < 0 || mPos.y >= gridSize) return;
 
     // Multimeter mode
     if (currentTool === 'multimeter' && hoverNode) {
@@ -526,8 +537,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       if (movingTiles) {
         let canPlace = true;
         for (const mt of movingTiles) {
-          const nx = mousePos.x + mt.dx;
-          const ny = mousePos.y + mt.dy;
+          const nx = mPos.x + mt.dx;
+          const ny = mPos.y + mt.dy;
           if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) {
             canPlace = false;
             break;
@@ -542,8 +553,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           setActiveGrid((prev) => {
             const next = prev.map((row) => [...row]);
             for (const mt of movingTiles) {
-              const nx = mousePos.x + mt.dx;
-              const ny = mousePos.y + mt.dy;
+              const nx = mPos.x + mt.dx;
+              const ny = mPos.y + mt.dy;
               next[ny][nx] = mt.tile;
             }
             return next;
@@ -553,7 +564,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           onShowAlert('該位置已有元件或超出邊界！');
         }
       } else {
-        const ct = activeGrid[mousePos.y][mousePos.x];
+        const ct = activeGrid[mPos.y][mPos.x];
         if (ct) {
           const toMove = [];
           if (ct.groupId) {
@@ -565,12 +576,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               }
             }
           } else {
-            toMove.push({ x: mousePos.x, y: mousePos.y, tile: ct });
+            toMove.push({ x: mPos.x, y: mPos.y, tile: ct });
           }
           
           const moveData = toMove.map(m => ({
-            dx: m.x - mousePos.x,
-            dy: m.y - mousePos.y,
+            dx: m.x - mPos.x,
+            dy: m.y - mPos.y,
             ox: m.x,
             oy: m.y,
             tile: m.tile
@@ -589,13 +600,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
       return;
     }
-    const t = activeGrid[mousePos.y][mousePos.x];
+    const t = activeGrid[mPos.y][mPos.x];
 
     // Interact Mode
     if (currentTool === 'interact') {
       if (t && ((t.type === 'btn' && t.subtype !== 'toggle') || (t.type === 'logic' && t.subtype === 'pushbtn') || (t.type === 'switch' && (t.subtype === '4way_top' || t.subtype === '4way_bot')))) {
         setActiveGrid((prev) => {
-          const curr = prev[mousePos.y][mousePos.x];
+          const curr = prev[mPos.y][mPos.x];
           if (!curr) return prev;
           return prev.map((row) =>
             row.map((c) => {
@@ -615,7 +626,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (t && t.type === 'btn' && t.subtype === 'toggle') {
         const ns = !t.isActive;
         setActiveGrid((prev) => {
-          const curr = prev[mousePos.y][mousePos.x];
+          const curr = prev[mPos.y][mPos.x];
           if (!curr) return prev;
           return prev.map((row) =>
             row.map((c) => {
@@ -651,8 +662,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const st = ((t.state || 0) + 1) % 2;
           setActiveGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            if (next[mousePos.y][mousePos.x]) {
-              next[mousePos.y][mousePos.x]!.state = st;
+            if (next[mPos.y][mPos.x]) {
+              next[mPos.y][mPos.x]!.state = st;
             }
             return next;
           });
@@ -660,8 +671,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const ns = !t.isActive;
           setActiveGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            if (next[mousePos.y][mousePos.x]) {
-              next[mousePos.y][mousePos.x] = Object.assign(new Tile(), next[mousePos.y][mousePos.x], { isActive: ns });
+            if (next[mPos.y][mPos.x]) {
+              next[mPos.y][mPos.x] = Object.assign(new Tile(), next[mPos.y][mPos.x], { isActive: ns });
             }
             return next;
           });
@@ -671,8 +682,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           onOpenModal(t, 'value', mousePos);
         } else {
           const canvas = canvasRef.current;
-          let rawX = mousePosRaw.x;
-          let rawY = mousePosRaw.y;
+          let rawX = mPosRaw.x;
+          let rawY = mPosRaw.y;
           if (canvas) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -680,15 +691,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             rawX = (e.clientX - rect.left) * scaleX;
             rawY = (e.clientY - rect.top) * scaleY;
           }
-          updateSlidePotentiometer(rawX, rawY, t, mousePos.x, mousePos.y);
-          setDragResistorGroupId(t.groupId || `r_${mousePos.x}_${mousePos.y}`);
+          updateSlidePotentiometer(rawX, rawY, t, mPos.x, mPos.y);
+          setDragResistorGroupId(t.groupId || `r_${mPos.x}_${mPos.y}`);
         }
       } else if (t && t.type === 'logic' && t.subtype === 'power') {
         const ns = !t.isActive;
         setActiveGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          if (next[mousePos.y][mousePos.x]) {
-            next[mousePos.y][mousePos.x] = Object.assign(new Tile(), next[mousePos.y][mousePos.x], { isActive: ns });
+          if (next[mPos.y][mPos.x]) {
+            next[mPos.y][mPos.x] = Object.assign(new Tile(), next[mPos.y][mPos.x], { isActive: ns });
           }
           return next;
         });
@@ -722,8 +733,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (t && t.type === 'protection' && t.subtype === 'fuse' && t.isBlown) {
         setActiveGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          if (next[mousePos.y][mousePos.x]) {
-            next[mousePos.y][mousePos.x]!.isBlown = false;
+          if (next[mPos.y][mPos.x]) {
+            next[mPos.y][mPos.x]!.isBlown = false;
           }
           return next;
         });
@@ -749,8 +760,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const next = prev.map((row) => [...row]);
         for (let y = 0; y < clipboard.h; y++) {
           for (let x = 0; x < clipboard.w; x++) {
-            const tx = mousePos.x + x;
-            const ty = mousePos.y + y;
+            const tx = mPos.x + x;
+            const ty = mPos.y + y;
             if (clipboard.data[y][x] && tx >= 0 && tx < gridSize && ty >= 0 && ty < gridSize) {
               next[ty][tx] = Object.assign(new Tile(), clipboard.data[y][x]);
             }
@@ -768,7 +779,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       currentTool === 'plc_plf' ||
       currentTool === 'plc_out'
     ) {
-      if (activeGrid[mousePos.y][mousePos.x] && activeGrid[mousePos.y][mousePos.x]!.isLocked) {
+      if (activeGrid[mPos.y][mPos.x] && activeGrid[mPos.y][mPos.x]!.isLocked) {
         onShowAlert('此元件已被鎖定，無法覆蓋！');
         return;
       }
@@ -779,8 +790,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
       // [BEGIN] Group removal intercept
       let gidToRemove: string | null = null;
-      if (activeGrid[mousePos.y][mousePos.x] && activeGrid[mousePos.y][mousePos.x]!.groupId) {
-        gidToRemove = activeGrid[mousePos.y][mousePos.x]!.groupId;
+      if (activeGrid[mPos.y][mPos.x] && activeGrid[mPos.y][mPos.x]!.groupId) {
+        gidToRemove = activeGrid[mPos.y][mPos.x]!.groupId;
       }
       
       const isCellAvailable = (x: number, y: number) => {
@@ -832,7 +843,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         newT.rotation = 0;
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       } else if (
@@ -848,18 +859,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         newT.rotation = 0;
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       } else if (placementType === 'plc' && placementSubtype === 'unit') {
         if (
-          mousePos.x + 3 < gridSize &&
-          mousePos.y + 9 < gridSize
+          mPos.x + 3 < gridSize &&
+          mPos.y + 9 < gridSize
         ) {
           let empty = true;
           for (let dy = 0; dy < 10; dy++) {
             for (let dx = 0; dx < 4; dx++) {
-              if (!isCellAvailable(mousePos.x + dx, mousePos.y + dy)) {
+              if (!isCellAvailable(mPos.x + dx, mPos.y + dy)) {
                 empty = false;
                 break;
               }
@@ -875,7 +886,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                   tile.groupId = gid;
                   tile.dx = dx;
                   tile.dy = dy;
-                  next[mousePos.y + dy][mousePos.x + dx] = tile;
+                  next[mPos.y + dy][mPos.x + dx] = tile;
                 }
               }
               return next;
@@ -927,7 +938,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         newT.labels[4] = prefix + (maxNum + 1);
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       } else if (placementType === 'terminal' && placementSubtype === 'block') {
@@ -944,7 +955,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         newT.labels[4] = 'TB' + (maxNum + 1);
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       } else if (
@@ -964,7 +975,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         newT.labels[4] = 'V' + (maxNum + 1);
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       } else if (
@@ -972,13 +983,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         (placementSubtype === 'valve_52' || placementSubtype === 'valve_52_double')
       ) {
         if (
-          mousePos.x - 2 >= 0 &&
-          mousePos.x + 2 < gridSize &&
-          isCellAvailable(mousePos.x - 2, mousePos.y) &&
-          isCellAvailable(mousePos.x - 1, mousePos.y) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x + 1, mousePos.y) &&
-          isCellAvailable(mousePos.x + 2, mousePos.y)
+          mPos.x - 2 >= 0 &&
+          mPos.x + 2 < gridSize &&
+          isCellAvailable(mPos.x - 2, mPos.y) &&
+          isCellAvailable(mPos.x - 1, mPos.y) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x + 1, mPos.y) &&
+          isCellAvailable(mPos.x + 2, mPos.y)
         ) {
           let maxV = 0;
           for (const r of activeGrid) {
@@ -1006,20 +1017,20 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x - 2] = t1;
-            next[mousePos.y][mousePos.x - 1] = t2;
-            next[mousePos.y][mousePos.x] = t3;
-            next[mousePos.y][mousePos.x + 1] = t4;
-            next[mousePos.y][mousePos.x + 2] = t5;
+            next[mPos.y][mPos.x - 2] = t1;
+            next[mPos.y][mPos.x - 1] = t2;
+            next[mPos.y][mPos.x] = t3;
+            next[mPos.y][mPos.x + 1] = t4;
+            next[mPos.y][mPos.x + 2] = t5;
             return next;
           });
         }
       } else if (placementType === 'power' && placementSubtype === '3phase') {
         if (
-          mousePos.x + 2 < gridSize &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x + 1, mousePos.y) &&
-          isCellAvailable(mousePos.x + 2, mousePos.y)
+          mPos.x + 2 < gridSize &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x + 1, mPos.y) &&
+          isCellAvailable(mPos.x + 2, mPos.y)
         ) {
           const gid = '3phase_' + Date.now();
           const r = new Tile('power', '3phase_r');
@@ -1030,17 +1041,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           t.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = r;
-            next[mousePos.y][mousePos.x + 1] = s;
-            next[mousePos.y][mousePos.x + 2] = t;
+            next[mPos.y][mPos.x] = r;
+            next[mPos.y][mPos.x + 1] = s;
+            next[mPos.y][mPos.x + 2] = t;
             return next;
           });
         }
       } else if (placementType === 'power' && placementSubtype === 'psu') {
         if (
-          mousePos.x + 1 < gridSize &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x + 1, mousePos.y)
+          mPos.x + 1 < gridSize &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x + 1, mPos.y)
         ) {
           const gid = 'psu_' + Date.now();
           const left = new Tile('power', 'psu_left');
@@ -1049,16 +1060,16 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           right.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = left;
-            next[mousePos.y][mousePos.x + 1] = right;
+            next[mPos.y][mPos.x] = left;
+            next[mPos.y][mPos.x + 1] = right;
             return next;
           });
         }
       } else if (placementType === 'switch' && placementSubtype === '4way') {
         if (
-          mousePos.y + 1 < gridSize &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x, mousePos.y + 1)
+          mPos.y + 1 < gridSize &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x, mPos.y + 1)
         ) {
           const gid = 'sw4_' + Date.now();
           const top = new Tile('switch', '4way_top');
@@ -1067,25 +1078,25 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           bot.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = top;
-            next[mousePos.y + 1][mousePos.x] = bot;
+            next[mPos.y][mPos.x] = top;
+            next[mPos.y + 1][mPos.x] = bot;
             return next;
           });
         }
       } else if (placementType === 'breaker' && placementSubtype === 'mcb') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 1 < gridSize : mousePos.x + 1 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y)
+          (isVert ? mPos.y + 1 < gridSize : mPos.x + 1 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y)
         ) {
           const gid = 'brk_' + Date.now();
           const t1 = new Tile('breaker', 'mcb'); t1.groupId = gid; t1.rotation = placementRotation;
           const t2 = new Tile('breaker', 'mcb'); t2.groupId = gid; t2.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
             return next;
           });
         } else {
@@ -1094,17 +1105,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'relay' && placementSubtype === 'mc_no_2') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 1 < gridSize : mousePos.x + 1 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y)
+          (isVert ? mPos.y + 1 < gridSize : mPos.x + 1 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y)
         ) {
           const gid = 'mc_' + Date.now();
           const t1 = new Tile('relay', 'mc_no_2'); t1.groupId = gid; t1.rotation = placementRotation;
           const t2 = new Tile('relay', 'mc_no_2'); t2.groupId = gid; t2.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
             return next;
           });
         } else {
@@ -1113,10 +1124,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'relay' && placementSubtype === 'mc_no_3') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 2 < gridSize : mousePos.x + 2 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 2, isVert ? mousePos.y + 2 : mousePos.y)
+          (isVert ? mPos.y + 2 < gridSize : mPos.x + 2 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 2, isVert ? mPos.y + 2 : mPos.y)
         ) {
           const gid = 'mc_' + Date.now();
           const t1 = new Tile('relay', 'mc_no_3'); t1.groupId = gid; t1.rotation = placementRotation;
@@ -1124,9 +1135,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const t3 = new Tile('relay', 'mc_no_3'); t3.groupId = gid; t3.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
-            next[isVert ? mousePos.y + 2 : mousePos.y][isVert ? mousePos.x : mousePos.x + 2] = t3;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
+            next[isVert ? mPos.y + 2 : mPos.y][isVert ? mPos.x : mPos.x + 2] = t3;
             return next;
           });
         } else {
@@ -1135,10 +1146,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'breaker' && placementSubtype === '3p') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 2 < gridSize : mousePos.x + 2 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 2, isVert ? mousePos.y + 2 : mousePos.y)
+          (isVert ? mPos.y + 2 < gridSize : mPos.x + 2 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 2, isVert ? mPos.y + 2 : mPos.y)
         ) {
           const gid = 'brk_' + Date.now();
           const t1 = new Tile('breaker', '3p'); t1.groupId = gid; t1.rotation = placementRotation;
@@ -1146,9 +1157,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const t3 = new Tile('breaker', '3p'); t3.groupId = gid; t3.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
-            next[isVert ? mousePos.y + 2 : mousePos.y][isVert ? mousePos.x : mousePos.x + 2] = t3;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
+            next[isVert ? mPos.y + 2 : mPos.y][isVert ? mPos.x : mPos.x + 2] = t3;
             return next;
           });
         } else {
@@ -1157,17 +1168,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'protection' && placementSubtype === 'ol_2p') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 1 < gridSize : mousePos.x + 1 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y)
+          (isVert ? mPos.y + 1 < gridSize : mPos.x + 1 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y)
         ) {
           const gid = 'ol_' + Date.now();
           const t1 = new Tile('protection', 'ol_2p'); t1.groupId = gid; t1.rotation = placementRotation;
           const t2 = new Tile('protection', 'ol_2p'); t2.groupId = gid; t2.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
             return next;
           });
         } else {
@@ -1176,10 +1187,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (placementType === 'protection' && placementSubtype === 'ol_3p') {
         const isVert = placementRotation === 1 || placementRotation === 3;
         if (
-          (isVert ? mousePos.y + 2 < gridSize : mousePos.x + 2 < gridSize) &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 1, isVert ? mousePos.y + 1 : mousePos.y) &&
-          isCellAvailable(isVert ? mousePos.x : mousePos.x + 2, isVert ? mousePos.y + 2 : mousePos.y)
+          (isVert ? mPos.y + 2 < gridSize : mPos.x + 2 < gridSize) &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 1, isVert ? mPos.y + 1 : mPos.y) &&
+          isCellAvailable(isVert ? mPos.x : mPos.x + 2, isVert ? mPos.y + 2 : mPos.y)
         ) {
           const gid = 'ol_' + Date.now();
           const t1 = new Tile('protection', 'ol_3p'); t1.groupId = gid; t1.rotation = placementRotation;
@@ -1187,9 +1198,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           const t3 = new Tile('protection', 'ol_3p'); t3.groupId = gid; t3.rotation = placementRotation;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[isVert ? mousePos.y + 1 : mousePos.y][isVert ? mousePos.x : mousePos.x + 1] = t2;
-            next[isVert ? mousePos.y + 2 : mousePos.y][isVert ? mousePos.x : mousePos.x + 2] = t3;
+            next[mPos.y][mPos.x] = t1;
+            next[isVert ? mPos.y + 1 : mPos.y][isVert ? mPos.x : mPos.x + 1] = t2;
+            next[isVert ? mPos.y + 2 : mPos.y][isVert ? mPos.x : mPos.x + 2] = t3;
             return next;
           });
         } else {
@@ -1197,10 +1208,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       } else if (placementType === 'protection' && placementSubtype === '3e_relay') {
         if (
-          mousePos.x + 2 < gridSize &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x + 1, mousePos.y) &&
-          isCellAvailable(mousePos.x + 2, mousePos.y)
+          mPos.x + 2 < gridSize &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x + 1, mPos.y) &&
+          isCellAvailable(mPos.x + 2, mPos.y)
         ) {
           const gid = '3erelay_' + Date.now();
           const t1 = new Tile('protection', '3e_relay');
@@ -1211,9 +1222,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           t3.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[mousePos.y][mousePos.x + 1] = t2;
-            next[mousePos.y][mousePos.x + 2] = t3;
+            next[mPos.y][mPos.x] = t1;
+            next[mPos.y][mPos.x + 1] = t2;
+            next[mPos.y][mPos.x + 2] = t3;
             return next;
           });
         } else {
@@ -1221,11 +1232,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       } else if (placementType === 'protection' && placementSubtype === 'converter') {
         if (
-          mousePos.x + 3 < gridSize &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x + 1, mousePos.y) &&
-          isCellAvailable(mousePos.x + 2, mousePos.y) &&
-          isCellAvailable(mousePos.x + 3, mousePos.y)
+          mPos.x + 3 < gridSize &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x + 1, mPos.y) &&
+          isCellAvailable(mPos.x + 2, mPos.y) &&
+          isCellAvailable(mPos.x + 3, mPos.y)
         ) {
           const gid = 'converter_' + Date.now();
           const t1 = new Tile('protection', 'converter');
@@ -1239,10 +1250,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           t4.state = 3;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = t1;
-            next[mousePos.y][mousePos.x + 1] = t2;
-            next[mousePos.y][mousePos.x + 2] = t3;
-            next[mousePos.y][mousePos.x + 3] = t4;
+            next[mPos.y][mPos.x] = t1;
+            next[mPos.y][mPos.x + 1] = t2;
+            next[mPos.y][mPos.x + 2] = t3;
+            next[mPos.y][mPos.x + 3] = t4;
             return next;
           });
         } else {
@@ -1250,10 +1261,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       } else if (placementType === 'platform' && placementSubtype === 'main') {
         if (
-          mousePos.y >= 2 &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x, mousePos.y - 1) &&
-          isCellAvailable(mousePos.x, mousePos.y - 2)
+          mPos.y >= 2 &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x, mPos.y - 1) &&
+          isCellAvailable(mPos.x, mPos.y - 2)
         ) {
           const gid = 'plat_' + Date.now();
           const bot = new Tile('platform', 'bot');
@@ -1265,9 +1276,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           top.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = bot;
-            next[mousePos.y - 1][mousePos.x] = mid;
-            next[mousePos.y - 2][mousePos.x] = top;
+            next[mPos.y][mPos.x] = bot;
+            next[mPos.y - 1][mPos.x] = mid;
+            next[mPos.y - 2][mPos.x] = top;
             return next;
           });
         } else {
@@ -1275,10 +1286,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       } else if (placementType === 'pneumatic' && placementSubtype === 'cylinder') {
         if (
-          mousePos.y >= 2 &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x, mousePos.y - 1) &&
-          isCellAvailable(mousePos.x, mousePos.y - 2)
+          mPos.y >= 2 &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x, mPos.y - 1) &&
+          isCellAvailable(mPos.x, mPos.y - 2)
         ) {
           const gid = 'cyl_' + Date.now();
           const bot = new Tile('pneumatic', 'cyl_bot');
@@ -1290,9 +1301,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           top.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = bot;
-            next[mousePos.y - 1][mousePos.x] = mid;
-            next[mousePos.y - 2][mousePos.x] = top;
+            next[mPos.y][mPos.x] = bot;
+            next[mPos.y - 1][mPos.x] = mid;
+            next[mPos.y - 2][mPos.x] = top;
             return next;
           });
         } else {
@@ -1300,10 +1311,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
       } else if (placementType === 'pneumatic' && placementSubtype === 'cylinder_single') {
         if (
-          mousePos.y >= 2 &&
-          isCellAvailable(mousePos.x, mousePos.y) &&
-          isCellAvailable(mousePos.x, mousePos.y - 1) &&
-          isCellAvailable(mousePos.x, mousePos.y - 2)
+          mPos.y >= 2 &&
+          isCellAvailable(mPos.x, mPos.y) &&
+          isCellAvailable(mPos.x, mPos.y - 1) &&
+          isCellAvailable(mPos.x, mPos.y - 2)
         ) {
           const gid = 'cyl_s_' + Date.now();
           const bot = new Tile('pneumatic', 'cyl_single_bot');
@@ -1315,9 +1326,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           top.groupId = gid;
           safeSetGrid((prev) => {
             const next = prev.map((row) => [...row]);
-            next[mousePos.y][mousePos.x] = bot;
-            next[mousePos.y - 1][mousePos.x] = mid;
-            next[mousePos.y - 2][mousePos.x] = top;
+            next[mPos.y][mPos.x] = bot;
+            next[mPos.y - 1][mPos.x] = mid;
+            next[mPos.y - 2][mPos.x] = top;
             return next;
           });
         } else {
@@ -1330,14 +1341,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         const rot = placementRotation;
         const isHoriz = rot % 2 === 0;
         const canPlace = isHoriz
-          ? mousePos.x + 2 < gridSize &&
-            isCellAvailable(mousePos.x, mousePos.y) &&
-            isCellAvailable(mousePos.x + 1, mousePos.y) &&
-            isCellAvailable(mousePos.x + 2, mousePos.y)
-          : mousePos.y + 2 < gridSize &&
-            isCellAvailable(mousePos.x, mousePos.y) &&
-            isCellAvailable(mousePos.x, mousePos.y + 1) &&
-            isCellAvailable(mousePos.x, mousePos.y + 2);
+          ? mPos.x + 2 < gridSize &&
+            isCellAvailable(mPos.x, mPos.y) &&
+            isCellAvailable(mPos.x + 1, mPos.y) &&
+            isCellAvailable(mPos.x + 2, mPos.y)
+          : mPos.y + 2 < gridSize &&
+            isCellAvailable(mPos.x, mPos.y) &&
+            isCellAvailable(mPos.x, mPos.y + 1) &&
+            isCellAvailable(mPos.x, mPos.y + 2);
 
         if (canPlace) {
           const gid = 'rvar_' + Date.now();
@@ -1360,23 +1371,23 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             const next = prev.map((row) => [...row]);
             if (isHoriz) {
               if (rot === 0) {
-                next[mousePos.y][mousePos.x] = tLeft;
-                next[mousePos.y][mousePos.x + 1] = tMid;
-                next[mousePos.y][mousePos.x + 2] = tRight;
+                next[mPos.y][mPos.x] = tLeft;
+                next[mPos.y][mPos.x + 1] = tMid;
+                next[mPos.y][mPos.x + 2] = tRight;
               } else {
-                next[mousePos.y][mousePos.x] = tRight;
-                next[mousePos.y][mousePos.x + 1] = tMid;
-                next[mousePos.y][mousePos.x + 2] = tLeft;
+                next[mPos.y][mPos.x] = tRight;
+                next[mPos.y][mPos.x + 1] = tMid;
+                next[mPos.y][mPos.x + 2] = tLeft;
               }
             } else {
               if (rot === 1) {
-                next[mousePos.y][mousePos.x] = tLeft;
-                next[mousePos.y + 1][mousePos.x] = tMid;
-                next[mousePos.y + 2][mousePos.x] = tRight;
+                next[mPos.y][mPos.x] = tLeft;
+                next[mPos.y + 1][mPos.x] = tMid;
+                next[mPos.y + 2][mPos.x] = tRight;
               } else {
-                next[mousePos.y][mousePos.x] = tRight;
-                next[mousePos.y + 1][mousePos.x] = tMid;
-                next[mousePos.y + 2][mousePos.x] = tLeft;
+                next[mPos.y][mPos.x] = tRight;
+                next[mPos.y + 1][mPos.x] = tMid;
+                next[mPos.y + 2][mPos.x] = tLeft;
               }
             }
             return next;
@@ -1407,14 +1418,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
         safeSetGrid((prev) => {
           const next = prev.map((row) => [...row]);
-          next[mousePos.y][mousePos.x] = newT;
+          next[mPos.y][mPos.x] = newT;
           return next;
         });
       }
     } else if (currentTool === 'autowire') {
       const last = autowireWaypoints[autowireWaypoints.length - 1];
-      if (!last || last.x !== mousePos.x || last.y !== mousePos.y) {
-        setAutowireWaypoints((prev) => [...prev, { x: mousePos.x, y: mousePos.y }]);
+      if (!last || last.x !== mPos.x || last.y !== mPos.y) {
+        setAutowireWaypoints((prev) => [...prev, { x: mPos.x, y: mPos.y }]);
       }
     }
   };
@@ -5531,7 +5542,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             style={{
               width: `${gridSize * TILE_SIZE * zoom}px`,
               height: `${gridSize * TILE_SIZE * zoom}px`,
-              cursor: currentTool === 'interact' ? 'default' : 'crosshair',
+              cursor: currentTool === 'interact' ? 'default' : 'crosshair', touchAction: 'none',
             }}
             onPointerMove={handlePointerMove}
             onPointerDown={handlePointerDown}
