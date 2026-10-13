@@ -308,6 +308,24 @@ export const WiringEngine = {
     const activeContacts = new Set<string>();
     const activeValves = new Set<string>();
 
+    // Register active buttons and switches by label for contact linking
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[0].length; x++) {
+        const t = grid[y][x];
+        if (
+          t &&
+          (t.type === 'btn' || t.type === 'switch') &&
+          (t.isActive || t.isPhysicallyPushed) &&
+          t.labels &&
+          t.labels[4]
+        ) {
+          const raw = t.labels[4];
+          activeContacts.add(raw);
+          activeContacts.add(raw.trim().toUpperCase());
+        }
+      }
+    }
+
     for (let y = 0; y < grid.length; y++) {
       for (let x = 0; x < grid[0].length; x++) {
         const t = grid[y][x];

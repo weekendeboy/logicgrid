@@ -70,8 +70,12 @@ export const Modals: React.FC<ModalsProps> = ({
               {mode === 'value' &&
                 (tile.type === 'power' && (tile.subtype === 'ac' || tile.subtype === 'power_ac')
                   ? '設定交流電 (AC)'
+                  : tile.type === 'power' && (tile.subtype === 'power_real' || tile.subtype === 'battery_real')
+                  ? '設定電池電動勢 (EMF)'
                   : tile.type === 'capacitor'
                   ? '設定電容值'
+                  : tile.type === 'inductor'
+                  ? '設定電感器電感量'
                   : (tile.type === 'resistor_var' || (tile.type === 'resistor' && (tile.subtype === 'var' || tile.subtype.startsWith('var_'))))
                   ? '設定滑動變阻器總電阻'
                   : tile.type === 'logic' && tile.subtype === 'clock'
@@ -87,8 +91,12 @@ export const Modals: React.FC<ModalsProps> = ({
                 <p className="text-xs text-slate-400 mb-1.5">
                   {tile.type === 'power' && (tile.subtype === 'ac' || tile.subtype === 'power_ac')
                     ? '頻率 (Hz) [建議 0.1 ~ 5 之間]：'
+                    : tile.type === 'power' && (tile.subtype === 'power_real' || tile.subtype === 'battery_real')
+                    ? '電動勢 EMF (V) [預設 1.5]：'
                     : tile.type === 'capacitor'
                     ? '容量 (μF) [預設 10000]：'
+                    : tile.type === 'inductor'
+                    ? '電感量 (mH) [預設 100]：'
                     : (tile.type === 'resistor_var' || (tile.type === 'resistor' && (tile.subtype === 'var' || tile.subtype.startsWith('var_'))))
                     ? '總電阻值 (Ω) [預設 100]：'
                     : tile.type === 'logic' && tile.subtype === 'clock'

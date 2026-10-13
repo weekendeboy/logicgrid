@@ -179,15 +179,46 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         />
       </div>
 
-      {/* Chapter 1: Basic Electronic */}
+      {/* Electronic Domain (Sandbox, Junior High, Senior High) */}
       {currentMode === 'electronic' && (
         <div className="p-4 border-b border-slate-800">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-            第一章：基本電學實習
+            電學實驗教室
           </div>
-          <button className="w-full text-left p-2.5 bg-blue-800 border border-blue-500 rounded-lg text-xs font-semibold text-white shadow flex items-center gap-2">
+          <button
+            className={`w-full text-left p-2.5 mb-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+              logicLevel === 'sandbox'
+                ? 'bg-blue-800 border-blue-500 text-white shadow'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+            onClick={() => onLoadLogicLevel('sandbox')}
+          >
             <FlaskConical className="w-4 h-4 text-purple-400" />
             <span>高解析沙盒模式</span>
+          </button>
+
+          <button
+            className={`w-full text-left p-2.5 mb-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+              logicLevel === 'jh-menu' || logicLevel.startsWith('jh-')
+                ? 'bg-amber-800 border-amber-500 text-white shadow'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+            onClick={() => onLoadLogicLevel('jh-menu')}
+          >
+            <GraduationCap className="w-4 h-4 text-amber-400" />
+            <span>國中理化 基本電學</span>
+          </button>
+
+          <button
+            className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+              logicLevel === 'sh-menu' || logicLevel.startsWith('sh-')
+                ? 'bg-indigo-800 border-indigo-500 text-white shadow'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+            onClick={() => onLoadLogicLevel('sh-menu')}
+          >
+            <GraduationCap className="w-4 h-4 text-indigo-400" />
+            <span>高中物理 進階電學</span>
           </button>
         </div>
       )}
@@ -250,29 +281,43 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
             第二章：數位邏輯
           </div>
-          <button
-            className={`w-full text-left p-2.5 mb-3 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
-              logicLevel === 'sandbox'
-                ? 'bg-blue-800 border-blue-500 text-white shadow'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-            }`}
-            onClick={() => onLoadLogicLevel('sandbox')}
-          >
-            <FlaskConical className="w-4 h-4 text-purple-400" />
-            <span>高解析沙盒模式</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+                logicLevel === 'sandbox'
+                  ? 'bg-blue-800 border-blue-500 text-white shadow'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+              }`}
+              onClick={() => onLoadLogicLevel('sandbox')}
+            >
+              <FlaskConical className="w-4 h-4 text-purple-400" />
+              <span>高解析沙盒模式</span>
+            </button>
 
-          <button
-            className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
-              logicLevel !== 'sandbox'
-                ? 'bg-amber-800 border-amber-500 text-white shadow'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-            }`}
-            onClick={() => onLoadLogicLevel('tutorial-menu')}
-          >
-            <GraduationCap className="w-4 h-4 text-amber-400" />
-            <span>教學關卡</span>
-          </button>
+            <button
+              className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+                logicLevel !== 'sandbox' && logicLevel !== 'logic-puzzle-menu' && !logicLevel.startsWith('lp-')
+                  ? 'bg-amber-800 border-amber-500 text-white shadow'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+              }`}
+              onClick={() => onLoadLogicLevel('tutorial-menu')}
+            >
+              <GraduationCap className="w-4 h-4 text-amber-400" />
+              <span>教學關卡</span>
+            </button>
+
+            <button
+              className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+                logicLevel === 'logic-puzzle-menu' || logicLevel.startsWith('lp-')
+                  ? 'bg-purple-800 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-purple-500/50'
+              }`}
+              onClick={() => onLoadLogicLevel('logic-puzzle-menu')}
+            >
+              <Puzzle className="w-4 h-4 text-purple-400" />
+              <span>遊戲解謎</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -299,7 +344,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </button>
             <button
               className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
-                logicLevel !== 'sandbox' && !logicLevel.startsWith('class_c')
+                logicLevel !== 'sandbox' &&
+                !logicLevel.startsWith('class_c') &&
+                logicLevel !== 'wiring-puzzle-menu' &&
+                !logicLevel.startsWith('wp-')
                   ? 'bg-amber-800 border-amber-500 text-white shadow'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
               }`}
@@ -307,6 +355,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             >
               <GraduationCap className="w-4 h-4 text-amber-400" />
               <span>教學關卡</span>
+            </button>
+
+            <button
+              className={`w-full text-left p-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 border ${
+                logicLevel === 'wiring-puzzle-menu' || logicLevel.startsWith('wp-')
+                  ? 'bg-purple-800 border-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-purple-500/50'
+              }`}
+              onClick={() => {
+                onLoadLogicLevel('wiring-puzzle-menu');
+                onSetSubMode('sandbox');
+              }}
+            >
+              <Puzzle className="w-4 h-4 text-purple-400" />
+              <span>遊戲解謎</span>
             </button>
 
             <button

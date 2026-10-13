@@ -20,11 +20,7 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
     else if (t.subtype === 'l' || t.subtype === 'n' || t.subtype === 'h' || t.subtype === 'g' || t.subtype === 'plus' || t.subtype === 'minus' || t.subtype === 'ground') groups = [[2]];
   } else {
     if (mode === 'electronic') {
-      if (t.type === 'power' || t.type === 'resistor' || t.type === 'led' || t.type === 'capacitor' || t.type === 'load') {
-        groups = [[0], [2]];
-      } else if (t.type === 'meter') {
-        groups = [[0], [1], [2], [3]];
-      } else if (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_')))) {
+      if (t.type === 'resistor_var' || (t.type === 'resistor' && (t.subtype === 'var' || t.subtype.startsWith('var_')))) {
         if (t.subtype === 'var_left') {
           groups = [[0, 2, 3]];
         } else if (t.subtype === 'var_right') {
@@ -34,8 +30,32 @@ export function getShortedPinGroups(t: Tile | null, mode: AppMode): number[][] {
         } else {
           groups = [[0], [1], [2]];
         }
-      } else if (t.type === 'switch' && t.subtype === 'spst') {
-        groups = act ? [[0, 2]] : [[0], [2]];
+      } else if (
+        t.type === 'power' ||
+        t.type === 'resistor' ||
+        t.type === 'led' ||
+        t.type === 'diode' ||
+        t.type === 'inductor' ||
+        t.type === 'capacitor' ||
+        t.type === 'load' ||
+        (t.type === 'protection' && t.subtype === 'fuse') ||
+        t.type === 'breaker'
+      ) {
+        groups = [[0], [2]];
+      } else if (t.type === 'meter') {
+        groups = [[0], [1], [2], [3]];
+      } else if (t.type === 'btn') {
+        const isNc = t.subtype === 'nc';
+        const closed = isNc ? !act : act;
+        groups = closed ? [[0, 2]] : [[0], [2]];
+      } else if (t.type === 'switch') {
+        if (t.subtype === 'spst') {
+          groups = act ? [[0, 2]] : [[0], [2]];
+        } else if (t.subtype === 'sel13' || t.subtype === 'spdt') {
+          const st = t.state || 0;
+          if (st === 0) groups = [[2, 0]];
+          else groups = [[2, 1]];
+        }
       }
     } else if (mode === 'logic' || mode === 'tutorial') {
       if (t.subtype === 'power' || t.subtype === 'pushbtn' || t.subtype === 'clock') {

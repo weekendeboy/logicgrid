@@ -3,7 +3,7 @@
  * Auto Studio Pro - Industrial Automation Simulation Platform
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   AppMode,
   SubMode,
@@ -18,25 +18,12 @@ import {
 import { Navbar } from './components/Navbar';
 import { LeftSidebar } from './components/LeftSidebar';
 import { RightSidebar } from './components/RightSidebar';
-import classCU17 from './levels/class_c_u1_7.json';
-import classCU11 from './levels/class_c_u1_1.json';
-import classCU12 from './levels/class_c_u1_2.json';
-import classCU13 from './levels/class_c_u1_3.json';
-import classCU23 from './levels/class_c_u2_3.json';
-
-import classCU14 from './levels/class_c_u1_4.json';
-import classCU15 from './levels/class_c_u1_5.json';
-import classCU16 from './levels/class_c_u1_6.json';
-import classCU21 from './levels/class_c_u2_1.json';
-import classCU22 from './levels/class_c_u2_2.json';
-import classCU24 from './levels/class_c_u2_4.json';
-import classCU25 from './levels/class_c_u2_5.json';
-import classCU26 from './levels/class_c_u2_6.json';
-import classCU27 from './levels/class_c_u2_7.json';
+import { LevelRegistry } from './levels/LevelRegistry';
 
 import { CanvasWorkspace } from './components/CanvasWorkspace';
 import { Modals } from './components/Modals';
 import { findAStarPath, layWiresOnPath } from './engine/Pathfinding';
+import { SelectionEngine } from './engine/SelectionEngine';
 
 export default function App() {
   const [currentMode, setCurrentMode] = useState<AppMode>('tutorial');
@@ -60,7 +47,8 @@ export default function App() {
     aVal: number;
     wVal: number;
     oscVal: number | null;
-  }>({ vVal: 0, aVal: 0, wVal: 0, oscVal: null });
+    channelOscVals?: Record<string, number>;
+  }>({ vVal: 0, aVal: 0, wVal: 0, oscVal: null, channelOscVals: {} });
 
   const [isFaultMode, setIsFaultMode] = useState<boolean>(false);
   const [faults, setFaults] = useState<Faults>({ opens: [], shorts: [] });
@@ -197,757 +185,9 @@ export default function App() {
         .map(() => Array(size).fill(null));
 
       if (mode === 'plc') {
-        const lastLadderCol = size - 1; // Put rails on left/right ends of the 60x60 ladder grid
-
-        // Column 0: H at (0, 0), T-wires facing right below
-        const tileH = new Tile('wire', 'h');
-        tileH.rotation = 0;
-        tileH.isLocked = true;
-        newLadderGrid[0][0] = tileH;
-
-        for (let y = 1; y < size; y++) {
-          const tileT = new Tile('wire', 't');
-          tileT.rotation = 3;
-          tileT.isLocked = true;
-          newLadderGrid[y][0] = tileT;
-        }
-
-        // Last column of ladder area: G at (lastLadderCol, 0), T-wires facing left below
-        const tileG = new Tile('wire', 'g');
-        tileG.rotation = 0;
-        tileG.isLocked = true;
-        newLadderGrid[0][lastLadderCol] = tileG;
-
-        for (let y = 1; y < size; y++) {
-          const tileT = new Tile('wire', 't');
-          tileT.rotation = 1;
-          tileT.isLocked = true;
-          newLadderGrid[y][lastLadderCol] = tileT;
-        }
+        LevelRegistry.setupPlcLadderRails(newLadderGrid, size);
       } else if (!forceSandbox && level && level !== 'sandbox') {
-        if (level === '0-1') {
-          const sw = new Tile('logic', 'power', 100);
-          sw.rotation = 1;
-          sw.isLocked = true;
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 1;
-          led.isLocked = true;
-          newGrid[3][4] = sw;
-          newGrid[5][4] = led;
-        } else if (level === '0-2') {
-          const sw = new Tile('logic', 'power', 100);
-          sw.rotation = 0;
-          sw.isLocked = true;
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 3;
-          led.isLocked = true;
-          newGrid[5][4] = sw;
-          newGrid[4][5] = led;
-        } else if (level === '0-3') {
-          const sw = new Tile('logic', 'power', 100);
-          sw.rotation = 0;
-          sw.isLocked = true;
-          const led1 = new Tile('logic', 'led', 0);
-          led1.rotation = 3;
-          led1.isLocked = true;
-          const led2 = new Tile('logic', 'led', 0);
-          led2.rotation = 1;
-          led2.isLocked = true;
-          newGrid[4][3] = sw;
-          newGrid[3][4] = led1;
-          newGrid[5][4] = led2;
-        } else if (level === '0-4') {
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 0;
-          sw1.isLocked = true;
-          sw1.labels[4] = 'A';
-          const led1 = new Tile('logic', 'led', 0);
-          led1.rotation = 0;
-          led1.isLocked = true;
-          led1.labels[4] = 'A';
-          newGrid[4][2] = sw1;
-          newGrid[4][6] = led1;
-
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1;
-          sw2.isLocked = true;
-          sw2.labels[4] = 'B';
-          const led2 = new Tile('logic', 'led', 0);
-          led2.rotation = 1;
-          led2.isLocked = true;
-          led2.labels[4] = 'B';
-          newGrid[2][4] = sw2;
-          newGrid[6][4] = led2;
-        } else if (level === '1-1') {
-          // 1-1: Just a power switch and LED
-          const sw = new Tile('logic', 'power', 100);
-          sw.rotation = 1;
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 1;
-          newGrid[3][4] = sw;
-          newGrid[6][4] = led;
-        } else if (level === '1-2') {
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 1;
-          const notGate = new Tile('gate', 'not');
-          notGate.rotation = 1; 
-          const led1 = new Tile('logic', 'led', 0);
-          led1.rotation = 1;
-          newGrid[2][3] = sw1;
-          newGrid[4][3] = notGate;
-          newGrid[6][3] = led1;
-
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1;
-          const bufferGate = new Tile('gate', 'buffer');
-          bufferGate.rotation = 1; 
-          const led2 = new Tile('logic', 'led', 0);
-          led2.rotation = 1;
-          newGrid[2][5] = sw2;
-          newGrid[4][5] = bufferGate;
-          newGrid[6][5] = led2;
-        } else if (level === '1-3') {
-          // 1-3: Two switches, AND gate, LED
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 1; // output at bottom
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1; // output at bottom
-          const andGate = new Tile('gate', 'and');
-          andGate.rotation = 1; // inputs L/R, output Bottom
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 1; // input Top
-          newGrid[2][3] = sw1;
-          newGrid[2][5] = sw2;
-          newGrid[4][4] = andGate;
-          newGrid[6][4] = led;
-        } else if (level === '1-4') {
-          // 1-4: Two switches, OR gate, LED
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 1;
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1;
-          const orGate = new Tile('gate', 'or');
-          orGate.rotation = 1;
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 1;
-          newGrid[2][3] = sw1;
-          newGrid[2][5] = sw2;
-          newGrid[4][4] = orGate;
-          newGrid[6][4] = led;
-        } else if (level === '1-5') {
-          // 1-5: NAND and NOR. We'll give them one set for NAND and one set for NOR side by side.
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 1;
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1;
-          const nandGate = new Tile('gate', 'nand');
-          nandGate.rotation = 1;
-          const led1 = new Tile('logic', 'led', 0);
-          led1.rotation = 1;
-          newGrid[2][2] = sw1;
-          newGrid[2][4] = sw2;
-          newGrid[4][3] = nandGate;
-          newGrid[6][3] = led1;
-
-          const sw3 = new Tile('logic', 'power', 100);
-          sw3.rotation = 1;
-          const sw4 = new Tile('logic', 'power', 100);
-          sw4.rotation = 1;
-          const norGate = new Tile('gate', 'nor');
-          norGate.rotation = 1;
-          const led2 = new Tile('logic', 'led', 0);
-          led2.rotation = 1;
-          newGrid[2][6] = sw3;
-          newGrid[2][8] = sw4;
-          newGrid[4][7] = norGate;
-          newGrid[6][7] = led2;
-        } else if (level === '1-6') {
-          // 1-6: XOR gate
-          const sw1 = new Tile('logic', 'power', 100);
-          sw1.rotation = 1;
-          const sw2 = new Tile('logic', 'power', 100);
-          sw2.rotation = 1;
-          const xorGate = new Tile('gate', 'xor');
-          xorGate.rotation = 1;
-          const led = new Tile('logic', 'led', 0);
-          led.rotation = 1;
-          newGrid[2][3] = sw1;
-          newGrid[2][5] = sw2;
-          newGrid[4][4] = xorGate;
-          newGrid[6][4] = led;
-        } else if (level === '2-1') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1;
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1;
-          const led = new Tile('logic', 'led', 0); led.rotation = 1;
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[8][5] = led;
-        } else if (level === '2-2') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const sw3 = new Tile('logic', 'power', 100); sw3.rotation = 1; sw3.labels[4] = 'C';
-          const led = new Tile('logic', 'led', 0); led.rotation = 1;
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[2][8] = sw3; newGrid[8][6] = led;
-        } else if (level === '2-3') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const swS = new Tile('logic', 'power', 100); swS.rotation = 1; swS.labels[4] = 'Sel';
-          const led = new Tile('logic', 'led', 0); led.rotation = 1;
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[2][8] = swS; newGrid[10][6] = led;
-        } else if (level === '2-4') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A1';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'A0';
-          const led0 = new Tile('logic', 'led', 0); led0.rotation = 1; led0.labels[0] = 'Y0';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Y1';
-          const led2 = new Tile('logic', 'led', 0); led2.rotation = 1; led2.labels[0] = 'Y2';
-          const led3 = new Tile('logic', 'led', 0); led3.rotation = 1; led3.labels[0] = 'Y3';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; 
-          newGrid[10][3] = led0; newGrid[10][5] = led1; newGrid[10][7] = led2; newGrid[10][9] = led3;
-        } else if (level === '2-5') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1;
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1;
-          const sw3 = new Tile('logic', 'power', 100); sw3.rotation = 1;
-          const led = new Tile('logic', 'led', 0); led.rotation = 1;
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[2][8] = sw3; newGrid[10][6] = led;
-        } else if (level === '3-1') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const ledS = new Tile('logic', 'led', 0); ledS.rotation = 1; ledS.labels[0] = 'S';
-          const ledC = new Tile('logic', 'led', 0); ledC.rotation = 1; ledC.labels[0] = 'C';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][5] = ledS; newGrid[10][7] = ledC;
-        } else if (level === '3-2') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const sw3 = new Tile('logic', 'power', 100); sw3.rotation = 1; sw3.labels[4] = 'Cin';
-          const ledS = new Tile('logic', 'led', 0); ledS.rotation = 1; ledS.labels[0] = 'S';
-          const ledC = new Tile('logic', 'led', 0); ledC.rotation = 1; ledC.labels[0] = 'Cout';
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[2][8] = sw3; newGrid[10][5] = ledS; newGrid[10][7] = ledC;
-        } else if (level === '3-3') {
-          const swA1 = new Tile('logic', 'power', 100); swA1.rotation = 1; swA1.labels[4] = 'A1';
-          const swA0 = new Tile('logic', 'power', 100); swA0.rotation = 1; swA0.labels[4] = 'A0';
-          const swB1 = new Tile('logic', 'power', 100); swB1.rotation = 1; swB1.labels[4] = 'B1';
-          const swB0 = new Tile('logic', 'power', 100); swB0.rotation = 1; swB0.labels[4] = 'B0';
-          const ledS1 = new Tile('logic', 'led', 0); ledS1.rotation = 1; ledS1.labels[0] = 'S1';
-          const ledS0 = new Tile('logic', 'led', 0); ledS0.rotation = 1; ledS0.labels[0] = 'S0';
-          const ledC = new Tile('logic', 'led', 0); ledC.rotation = 1; ledC.labels[0] = 'Cout';
-          newGrid[2][3] = swA1; newGrid[2][5] = swA0; newGrid[2][7] = swB1; newGrid[2][9] = swB0;
-          newGrid[10][4] = ledC; newGrid[10][6] = ledS1; newGrid[10][8] = ledS0;
-        } else if (level === '3-4') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'A>B';
-          const led2 = new Tile('logic', 'led', 0); led2.rotation = 1; led2.labels[0] = 'A=B';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][5] = led1; newGrid[10][7] = led2;
-        } else if (level === '4-1') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1;
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1;
-          newGrid[2][5] = sw1; newGrid[10][5] = led1;
-        } else if (level === '4-2') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'S';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'R';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Q';
-          const led2 = new Tile('logic', 'led', 0); led2.rotation = 1; led2.labels[0] = 'Q\'';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][5] = led1; newGrid[10][7] = led2;
-        } else if (level === '4-3') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'D';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'En';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Q';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][6] = led1;
-        } else if (level === '4-4') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'D';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'CLK';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Q';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][6] = led1;
-        } else if (level === '4-5') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'T';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'CLK';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Q';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[10][6] = led1;
-        } else if (level === '5-1') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'In';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'CLK';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1;
-          const led2 = new Tile('logic', 'led', 0); led2.rotation = 1;
-          const led3 = new Tile('logic', 'led', 0); led3.rotation = 1;
-          const led4 = new Tile('logic', 'led', 0); led4.rotation = 1;
-          newGrid[2][6] = sw1; newGrid[2][8] = sw2; 
-          newGrid[12][5] = led1; newGrid[12][7] = led2; newGrid[12][9] = led3; newGrid[12][11] = led4;
-        } else if (level === '5-2') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'CLK';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Bit0';
-          const led2 = new Tile('logic', 'led', 0); led2.rotation = 1; led2.labels[0] = 'Bit1';
-          newGrid[2][5] = sw1; newGrid[12][5] = led1; newGrid[12][7] = led2;
-        } else if (level === '5-3') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = 'A';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = 'B';
-          const sw3 = new Tile('logic', 'power', 100); sw3.rotation = 1; sw3.labels[4] = 'Enter';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = 'Unlock';
-          newGrid[2][4] = sw1; newGrid[2][6] = sw2; newGrid[2][8] = sw3; newGrid[12][6] = led1;
-        } else if (level === '5-4') {
-          const sw1 = new Tile('logic', 'power', 100); sw1.rotation = 1; sw1.labels[4] = '1元';
-          const sw2 = new Tile('logic', 'power', 100); sw2.rotation = 1; sw2.labels[4] = '退幣';
-          const led1 = new Tile('logic', 'led', 0); led1.rotation = 1; led1.labels[0] = '可購買';
-          newGrid[2][5] = sw1; newGrid[2][7] = sw2; newGrid[12][6] = led1;
-        } else if (level === 'w-1-1') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const noBtn = new Tile('btn', 'no'); noBtn.rotation = 0; noBtn.isLocked = true;
-          const light = new Tile('load', 'lightbulb'); light.rotation = 0; light.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 2; wireN.isLocked = true;
-          newGrid[1][4] = wireL;
-          newGrid[3][4] = noBtn;
-          newGrid[5][4] = light;
-          newGrid[7][4] = wireN;
-        } else if (level === 'w-1-2') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const noBtn1 = new Tile('btn', 'no'); noBtn1.rotation = 0; noBtn1.isLocked = true;
-          const noBtn2 = new Tile('btn', 'no'); noBtn2.rotation = 0; noBtn2.isLocked = true;
-          const light = new Tile('load', 'lightbulb'); light.rotation = 0; light.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 2; wireN.isLocked = true;
-          newGrid[0][4] = wireL;
-          newGrid[2][4] = noBtn1;
-          newGrid[4][4] = noBtn2;
-          newGrid[6][4] = light;
-          newGrid[8][4] = wireN;
-        } else if (level === 'w-1-3') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const noBtn1 = new Tile('btn', 'no'); noBtn1.rotation = 0; noBtn1.isLocked = true;
-          const noBtn2 = new Tile('btn', 'no'); noBtn2.rotation = 0; noBtn2.isLocked = true;
-          const light = new Tile('load', 'lightbulb'); light.rotation = 0; light.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 2; wireN.isLocked = true;
-          newGrid[1][4] = wireL;
-          newGrid[3][3] = noBtn1;
-          newGrid[3][5] = noBtn2;
-          newGrid[5][4] = light;
-          newGrid[7][4] = wireN;
-        } else if (level === 'w-1-4') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const ncBtn = new Tile('btn', 'nc'); ncBtn.rotation = 0; ncBtn.isLocked = true;
-          const light = new Tile('load', 'lightbulb'); light.rotation = 0; light.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 2; wireN.isLocked = true;
-          newGrid[1][4] = wireL;
-          newGrid[3][4] = ncBtn;
-          newGrid[5][4] = light;
-          newGrid[7][4] = wireN;
-        } else if (level === 'w-2-1') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 3; wireL.isLocked = true;
-          const noBtn = new Tile('btn', 'no'); noBtn.rotation = 1; noBtn.isLocked = true;
-          const coil = new Tile('relay', 'coil'); coil.rotation = 1; coil.isLocked = true; coil.labels[4] = 'K1';
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 1; wireN.isLocked = true;
-          const relayNo = new Tile('relay', 'no'); relayNo.rotation = 1; relayNo.isLocked = true; relayNo.labels[4] = 'K1';
-          const motor = new Tile('motor', 'motor'); motor.rotation = 1; motor.isLocked = true;
-          
-          newGrid[3][1] = wireL;
-          newGrid[3][3] = noBtn;
-          newGrid[3][5] = coil;
-          newGrid[3][7] = wireN;
-          
-          newGrid[5][3] = relayNo;
-          newGrid[5][5] = motor;
-        } else if (level === 'w-2-2') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 3; wireL.isLocked = true;
-          const noBtn = new Tile('btn', 'no'); noBtn.rotation = 1; noBtn.isLocked = true;
-          noBtn.labels[3] = '14'; noBtn.labels[1] = '13'; noBtn.labels[4] = 'BTN';
-          const coil = new Tile('relay', 'coil'); coil.rotation = 1; coil.isLocked = true; coil.labels[4] = 'K1';
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 1; wireN.isLocked = true;
-          
-          const relayNo1 = new Tile('relay', 'no'); relayNo1.rotation = 1; relayNo1.isLocked = true; relayNo1.labels[4] = 'K1';
-          const relayNo2 = new Tile('relay', 'no'); relayNo2.rotation = 1; relayNo2.isLocked = true; relayNo2.labels[4] = 'K1';
-          
-          const motor = new Tile('motor', 'motor'); motor.rotation = 1; motor.isLocked = true;
-
-          newGrid[1][1] = wireL;
-          newGrid[1][3] = noBtn;
-          newGrid[1][5] = coil;
-          newGrid[1][7] = wireN;
-
-          newGrid[3][3] = relayNo1;
-
-          newGrid[5][3] = relayNo2;
-          newGrid[5][5] = motor;
-        } else if (level === 'w-2-3') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 3; wireL.isLocked = true;
-          const ncBtn = new Tile('btn', 'nc'); ncBtn.rotation = 1; ncBtn.isLocked = true;
-          ncBtn.labels[3] = '12'; ncBtn.labels[1] = '11';
-          const noBtn = new Tile('btn', 'no'); noBtn.rotation = 1; noBtn.isLocked = true;
-          noBtn.labels[3] = '14'; noBtn.labels[1] = '13'; noBtn.labels[4] = 'BTN';
-          const coil = new Tile('relay', 'coil'); coil.rotation = 1; coil.isLocked = true; coil.labels[4] = 'K1';
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 1; wireN.isLocked = true;
-          
-          const relayNo1 = new Tile('relay', 'no'); relayNo1.rotation = 1; relayNo1.isLocked = true; relayNo1.labels[4] = 'K1';
-          const relayNo2 = new Tile('relay', 'no'); relayNo2.rotation = 1; relayNo2.isLocked = true; relayNo2.labels[4] = 'K1';
-          
-          const motor = new Tile('motor', 'motor'); motor.rotation = 1; motor.isLocked = true;
-
-          newGrid[4][0] = wireL;
-          newGrid[4][2] = ncBtn;
-          newGrid[4][4] = noBtn;
-          newGrid[4][6] = coil;
-          newGrid[4][8] = wireN;
-
-          newGrid[6][4] = relayNo1;
-
-          newGrid[8][4] = relayNo2;
-          newGrid[8][6] = motor;
-        } else if (level === 'w-2-4') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 3; wireL.isLocked = true;
-          const ncBtn1 = new Tile('btn', 'nc'); ncBtn1.rotation = 1; ncBtn1.isLocked = true;
-          ncBtn1.labels[3] = '12'; ncBtn1.labels[1] = '11';
-          const noBtn1 = new Tile('btn', 'no'); noBtn1.rotation = 1; noBtn1.isLocked = true;
-          noBtn1.labels[3] = '14'; noBtn1.labels[1] = '13'; noBtn1.labels[4] = 'BTN';
-          const coil = new Tile('relay', 'coil'); coil.rotation = 1; coil.isLocked = true; coil.labels[4] = 'K1';
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 1; wireN.isLocked = true;
-          
-          const ncBtn2 = new Tile('btn', 'nc'); ncBtn2.rotation = 1; ncBtn2.isLocked = true;
-          ncBtn2.labels[3] = '12'; ncBtn2.labels[1] = '11';
-          const noBtn2 = new Tile('btn', 'no'); noBtn2.rotation = 1; noBtn2.isLocked = true;
-          noBtn2.labels[3] = '14'; noBtn2.labels[1] = '13'; noBtn2.labels[4] = 'BTN';
-
-          const relayNo1 = new Tile('relay', 'no'); relayNo1.rotation = 1; relayNo1.isLocked = true; relayNo1.labels[4] = 'K1';
-          const relayNo2 = new Tile('relay', 'no'); relayNo2.rotation = 1; relayNo2.isLocked = true; relayNo2.labels[4] = 'K1';
-          
-          const motor = new Tile('motor', 'motor'); motor.rotation = 1; motor.isLocked = true;
-
-          newGrid[1][0] = wireL;
-          newGrid[1][2] = ncBtn1;
-          newGrid[1][4] = noBtn1;
-          newGrid[1][6] = coil;
-          newGrid[1][8] = wireN;
-
-          newGrid[3][2] = ncBtn2;
-          newGrid[3][4] = noBtn2;
-
-          newGrid[5][4] = relayNo1;
-
-          newGrid[7][4] = relayNo2;
-          newGrid[7][6] = motor;
-        } else if (level === 'w-3-1') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 0; wireN.isLocked = true;
-          
-          const btnNc = new Tile('btn', 'nc'); btnNc.rotation = 1; btnNc.isLocked = true; btnNc.labels[1] = '11'; btnNc.labels[2] = '12';
-          const relayNcK2 = new Tile('relay', 'nc'); relayNcK2.rotation = 1; relayNcK2.isLocked = true; relayNcK2.labels[4] = 'K2';
-          const btnNo1 = new Tile('btn', 'no'); btnNo1.rotation = 1; btnNo1.isLocked = true; btnNo1.labels[1] = '13'; btnNo1.labels[2] = '14';
-          const coilK1 = new Tile('relay', 'coil'); coilK1.rotation = 1; coilK1.isLocked = true; coilK1.labels[4] = 'K1';
-
-          const relayNoK1 = new Tile('relay', 'no'); relayNoK1.rotation = 1; relayNoK1.isLocked = true; relayNoK1.labels[4] = 'K1';
-
-          const relayNcK1 = new Tile('relay', 'nc'); relayNcK1.rotation = 1; relayNcK1.isLocked = true; relayNcK1.labels[4] = 'K1';
-          const btnNo2 = new Tile('btn', 'no'); btnNo2.rotation = 1; btnNo2.isLocked = true; btnNo2.labels[1] = '13'; btnNo2.labels[2] = '14';
-          const coilK2 = new Tile('relay', 'coil'); coilK2.rotation = 3; coilK2.isLocked = true; coilK2.labels[4] = 'K2';
-
-          const relayNoK2 = new Tile('relay', 'no'); relayNoK2.rotation = 1; relayNoK2.isLocked = true; relayNoK2.labels[4] = 'K2';
-
-          newGrid[0][0] = wireL;
-          newGrid[0][8] = wireN;
-
-          newGrid[1][1] = btnNc;
-          newGrid[1][3] = relayNcK2;
-          newGrid[1][5] = btnNo1;
-          newGrid[1][7] = coilK1;
-
-          newGrid[3][5] = relayNoK1;
-
-          newGrid[5][3] = relayNcK1;
-          newGrid[5][5] = btnNo2;
-          newGrid[5][7] = coilK2;
-
-          newGrid[7][5] = relayNoK2;
-        } else if (level === 'w-3-2') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 0; wireN.isLocked = true;
-
-          const btnNc = new Tile('btn', 'nc'); btnNc.rotation = 1; btnNc.isLocked = true; btnNc.labels[1] = '11'; btnNc.labels[2] = '12';
-          const relayNcK2 = new Tile('relay', 'nc'); relayNcK2.rotation = 1; relayNcK2.isLocked = true; relayNcK2.labels[4] = 'K2';
-          const btnNo1 = new Tile('btn', 'no'); btnNo1.rotation = 1; btnNo1.isLocked = true; btnNo1.labels[1] = '13'; btnNo1.labels[2] = '14';
-          const coilK1 = new Tile('relay', 'coil'); coilK1.rotation = 1; coilK1.isLocked = true; coilK1.labels[4] = 'K1';
-
-          const relayNoK1 = new Tile('relay', 'no'); relayNoK1.rotation = 1; relayNoK1.isLocked = true; relayNoK1.labels[4] = 'K1';
-
-          const relayNcK1 = new Tile('relay', 'nc'); relayNcK1.rotation = 1; relayNcK1.isLocked = true; relayNcK1.labels[4] = 'K1';
-          const btnNo2 = new Tile('btn', 'no'); btnNo2.rotation = 1; btnNo2.isLocked = true; btnNo2.labels[1] = '13'; btnNo2.labels[2] = '14';
-          const coilK2 = new Tile('relay', 'coil'); coilK2.rotation = 3; coilK2.isLocked = true; coilK2.labels[4] = 'K2';
-
-          const relayNoK2 = new Tile('relay', 'no'); relayNoK2.rotation = 1; relayNoK2.isLocked = true; relayNoK2.labels[4] = 'K2';
-
-          const relayNoK1_2 = new Tile('relay', 'no'); relayNoK1_2.rotation = 1; relayNoK1_2.isLocked = true; relayNoK1_2.labels[4] = 'K1';
-          const relayNcK1_2 = new Tile('relay', 'nc'); relayNcK1_2.rotation = 1; relayNcK1_2.isLocked = true; relayNcK1_2.labels[4] = 'K1';
-
-          const motor = new Tile('motor', 'motor'); motor.rotation = 0; motor.rotationAngle = 80; motor.isLocked = true;
-
-          const relayNoK2_2 = new Tile('relay', 'no'); relayNoK2_2.rotation = 1; relayNoK2_2.isLocked = true; relayNoK2_2.labels[4] = 'K2';
-          const relayNcK2_2 = new Tile('relay', 'nc'); relayNcK2_2.rotation = 1; relayNcK2_2.isLocked = true; relayNcK2_2.labels[4] = 'K2';
-
-          newGrid[0][0] = wireL;
-          newGrid[0][8] = wireN;
-
-          newGrid[1][1] = btnNc;
-          newGrid[1][3] = relayNcK2;
-          newGrid[1][5] = btnNo1;
-          newGrid[1][7] = coilK1;
-
-          newGrid[2][5] = relayNoK1;
-
-          newGrid[3][3] = relayNcK1;
-          newGrid[3][5] = btnNo2;
-          newGrid[3][7] = coilK2;
-
-          newGrid[4][5] = relayNoK2;
-
-          newGrid[6][3] = relayNoK1_2;
-          newGrid[6][7] = relayNcK1_2;
-
-          newGrid[7][5] = motor;
-
-          newGrid[8][3] = relayNoK2_2;
-          newGrid[8][7] = relayNcK2_2;
-        } else if (level === 'w-3-3') {
-          const wireL = new Tile('wire', 'l'); wireL.rotation = 0; wireL.isLocked = true;
-          const wireN = new Tile('wire', 'n'); wireN.rotation = 0; wireN.isLocked = true;
-
-          const btnNc = new Tile('btn', 'nc'); btnNc.rotation = 1; btnNc.isLocked = true; btnNc.labels[1] = '11'; btnNc.labels[2] = '12';
-          const btnNo1 = new Tile('btn', 'no'); btnNo1.rotation = 1; btnNo1.isLocked = true; btnNo1.labels[1] = '13'; btnNo1.labels[2] = '14';
-          const coilK1 = new Tile('relay', 'coil'); coilK1.rotation = 1; coilK1.isLocked = true; coilK1.labels[4] = 'K1';
-
-          const relayNoK1_1 = new Tile('relay', 'no'); relayNoK1_1.rotation = 1; relayNoK1_1.isLocked = true; relayNoK1_1.labels[4] = 'K1';
-
-          const relayNoK1_2 = new Tile('relay', 'no'); relayNoK1_2.rotation = 1; relayNoK1_2.isLocked = true; relayNoK1_2.labels[4] = 'K1';
-          const btnNo2 = new Tile('btn', 'no'); btnNo2.rotation = 1; btnNo2.isLocked = true; btnNo2.labels[1] = '13'; btnNo2.labels[2] = '14';
-          const coilK2 = new Tile('relay', 'coil'); coilK2.rotation = 3; coilK2.isLocked = true; coilK2.labels[4] = 'K2';
-
-          const relayNoK2_1 = new Tile('relay', 'no'); relayNoK2_1.rotation = 1; relayNoK2_1.isLocked = true; relayNoK2_1.labels[4] = 'K2';
-
-          const relayNoK1_3 = new Tile('relay', 'no'); relayNoK1_3.rotation = 1; relayNoK1_3.isLocked = true; relayNoK1_3.labels[4] = 'K1';
-          const motor1 = new Tile('motor', 'motor'); motor1.rotation = 1; motor1.isLocked = true;
-
-          const relayNoK2_2 = new Tile('relay', 'no'); relayNoK2_2.rotation = 1; relayNoK2_2.isLocked = true; relayNoK2_2.labels[4] = 'K2';
-          const motor2 = new Tile('motor', 'motor'); motor2.rotation = 1; motor2.isLocked = true;
-
-          newGrid[0][0] = wireL;
-          newGrid[0][8] = wireN;
-
-          newGrid[1][1] = btnNc;
-          newGrid[1][5] = btnNo1;
-          newGrid[1][7] = coilK1;
-
-          newGrid[2][5] = relayNoK1_1;
-
-          newGrid[3][3] = relayNoK1_2;
-          newGrid[3][5] = btnNo2;
-          newGrid[3][7] = coilK2;
-
-          newGrid[4][5] = relayNoK2_1;
-
-          newGrid[6][5] = relayNoK1_3;
-          newGrid[6][7] = motor1;
-
-          newGrid[8][5] = relayNoK2_2;
-          newGrid[8][7] = motor2;
-        } else if (level === 'w-4-1') {
-          newGrid[0][0] = new Tile('wire', 'l'); newGrid[0][0].rotation = 0;
-          newGrid[0][8] = new Tile('wire', 'n'); newGrid[0][8].rotation = 0;
-          
-          newGrid[1][0] = new Tile('wire', 't'); newGrid[1][0].rotation = 3;
-          newGrid[1][1] = new Tile('btn', 'nc'); newGrid[1][1].rotation = 1; newGrid[1][1].labels[1] = '11'; newGrid[1][1].labels[2] = '12';
-          newGrid[1][2] = new Tile('wire', 't'); newGrid[1][2].rotation = 0;
-          newGrid[1][3] = new Tile('btn', 'no'); newGrid[1][3].rotation = 1; newGrid[1][3].labels[1] = '13'; newGrid[1][3].labels[2] = '14';
-          newGrid[1][4] = new Tile('wire', 't'); newGrid[1][4].rotation = 0;
-          newGrid[1][5] = new Tile('wire', 'straight'); newGrid[1][5].rotation = 1;
-          newGrid[1][6] = new Tile('wire', 'straight'); newGrid[1][6].rotation = 1;
-          newGrid[1][7] = new Tile('relay', 'coil'); newGrid[1][7].rotation = 1; newGrid[1][7].labels[4] = 'T1';
-          newGrid[1][8] = new Tile('wire', 't'); newGrid[1][8].rotation = 1;
-
-          newGrid[2][0] = new Tile('wire', 'straight'); newGrid[2][0].rotation = 0;
-          newGrid[2][2] = new Tile('wire', 'straight'); newGrid[2][2].rotation = 2;
-          newGrid[2][4] = new Tile('wire', 'straight'); newGrid[2][4].rotation = 2;
-          newGrid[2][8] = new Tile('wire', 'straight'); newGrid[2][8].rotation = 0;
-
-          newGrid[3][0] = new Tile('wire', 'straight'); newGrid[3][0].rotation = 0;
-          newGrid[3][2] = new Tile('wire', 'turn'); newGrid[3][2].rotation = 0;
-          newGrid[3][3] = new Tile('relay', 'no'); newGrid[3][3].rotation = 1; newGrid[3][3].labels[4] = 'T1';
-          newGrid[3][4] = new Tile('wire', 't'); newGrid[3][4].rotation = 2;
-          newGrid[3][5] = new Tile('wire', 'straight'); newGrid[3][5].rotation = 1;
-          newGrid[3][6] = new Tile('wire', 'straight'); newGrid[3][6].rotation = 1;
-          newGrid[3][7] = new Tile('relay', 'flash_coil'); newGrid[3][7].rotation = 1; newGrid[3][7].value = 1000; newGrid[3][7].labels[4] = 'F1';
-          newGrid[3][8] = new Tile('wire', 't'); newGrid[3][8].rotation = 1;
-
-          newGrid[4][0] = new Tile('wire', 'straight'); newGrid[4][0].rotation = 0;
-          newGrid[4][8] = new Tile('wire', 'straight'); newGrid[4][8].rotation = 0;
-
-          newGrid[5][0] = new Tile('wire', 't'); newGrid[5][0].rotation = 3;
-          newGrid[5][1] = new Tile('relay', 'ton_nc'); newGrid[5][1].rotation = 1; newGrid[5][1].value = 3000; newGrid[5][1].labels[4] = 'T1';
-          newGrid[5][2] = new Tile('wire', 'straight'); newGrid[5][2].rotation = 1;
-          newGrid[5][3] = new Tile('relay', 'no'); newGrid[5][3].rotation = 1; newGrid[5][3].labels[4] = 'F1';
-          newGrid[5][4] = new Tile('wire', 'straight'); newGrid[5][4].rotation = 1;
-          newGrid[5][5] = new Tile('wire', 'straight'); newGrid[5][5].rotation = 1;
-          newGrid[5][6] = new Tile('wire', 'straight'); newGrid[5][6].rotation = 1;
-          newGrid[5][7] = new Tile('load', 'lightbulb'); newGrid[5][7].rotation = 1;
-          newGrid[5][8] = new Tile('wire', 't'); newGrid[5][8].rotation = 1;
-
-          newGrid[6][0] = new Tile('wire', 'straight'); newGrid[6][0].rotation = 0;
-          newGrid[6][8] = new Tile('wire', 'straight'); newGrid[6][8].rotation = 0;
-
-          newGrid[7][0] = new Tile('wire', 'turn'); newGrid[7][0].rotation = 0;
-          newGrid[7][1] = new Tile('relay', 'ton_no'); newGrid[7][1].rotation = 1; newGrid[7][1].value = 3000; newGrid[7][1].labels[4] = 'T1';
-          newGrid[7][2] = new Tile('wire', 'straight'); newGrid[7][2].rotation = 1;
-          newGrid[7][3] = new Tile('wire', 'straight'); newGrid[7][3].rotation = 1;
-          newGrid[7][4] = new Tile('wire', 'straight'); newGrid[7][4].rotation = 1;
-          newGrid[7][5] = new Tile('wire', 'straight'); newGrid[7][5].rotation = 1;
-          newGrid[7][6] = new Tile('wire', 'straight'); newGrid[7][6].rotation = 1;
-          newGrid[7][7] = new Tile('motor', ''); newGrid[7][7].rotation = 1;
-          newGrid[7][8] = new Tile('wire', 'turn'); newGrid[7][8].rotation = 3;
-        } else if (level === 'w-4-2') {
-          newGrid[0][0] = new Tile('wire', 'l'); newGrid[0][0].rotation = 0;
-          newGrid[0][8] = new Tile('wire', 'n'); newGrid[0][8].rotation = 0;
-
-          newGrid[1][0] = new Tile('wire', 't'); newGrid[1][0].rotation = 3;
-          newGrid[1][1] = new Tile('btn', 'nc'); newGrid[1][1].rotation = 1; newGrid[1][1].labels[1] = '11'; newGrid[1][1].labels[2] = '12';
-          newGrid[1][2] = new Tile('wire', 'straight'); newGrid[1][2].rotation = 1;
-          newGrid[1][3] = new Tile('relay', 'ton_nc'); newGrid[1][3].rotation = 1; newGrid[1][3].value = 5000; newGrid[1][3].labels[4] = 'T1';
-          newGrid[1][4] = new Tile('wire', 't'); newGrid[1][4].rotation = 0;
-          newGrid[1][5] = new Tile('btn', 'no'); newGrid[1][5].rotation = 1; newGrid[1][5].labels[1] = '13'; newGrid[1][5].labels[2] = '14';
-          newGrid[1][6] = new Tile('wire', 't'); newGrid[1][6].rotation = 0;
-          newGrid[1][7] = new Tile('relay', 'coil'); newGrid[1][7].rotation = 1; newGrid[1][7].labels[4] = 'T1';
-          newGrid[1][8] = new Tile('wire', 't'); newGrid[1][8].rotation = 1;
-
-          newGrid[2][0] = new Tile('wire', 'straight'); newGrid[2][0].rotation = 0;
-          newGrid[2][4] = new Tile('wire', 'straight'); newGrid[2][4].rotation = 2;
-          newGrid[2][6] = new Tile('wire', 'straight'); newGrid[2][6].rotation = 2;
-          newGrid[2][8] = new Tile('wire', 'straight'); newGrid[2][8].rotation = 0;
-
-          newGrid[3][0] = new Tile('wire', 'straight'); newGrid[3][0].rotation = 0;
-          newGrid[3][4] = new Tile('wire', 'turn'); newGrid[3][4].rotation = 0;
-          newGrid[3][5] = new Tile('relay', 'no'); newGrid[3][5].rotation = 1; newGrid[3][5].labels[4] = 'T1';
-          newGrid[3][6] = new Tile('wire', 'turn'); newGrid[3][6].rotation = 3;
-          newGrid[3][8] = new Tile('wire', 'straight'); newGrid[3][8].rotation = 0;
-
-          newGrid[4][0] = new Tile('wire', 'straight'); newGrid[4][0].rotation = 0;
-          newGrid[4][8] = new Tile('wire', 'straight'); newGrid[4][8].rotation = 0;
-
-          newGrid[5][0] = new Tile('wire', 'turn'); newGrid[5][0].rotation = 0;
-          newGrid[5][1] = new Tile('relay', 'no'); newGrid[5][1].rotation = 1; newGrid[5][1].labels[4] = 'T1';
-          newGrid[5][2] = new Tile('wire', 'straight'); newGrid[5][2].rotation = 1;
-          newGrid[5][3] = new Tile('wire', 'straight'); newGrid[5][3].rotation = 1;
-          newGrid[5][4] = new Tile('wire', 'straight'); newGrid[5][4].rotation = 1;
-          newGrid[5][5] = new Tile('wire', 'straight'); newGrid[5][5].rotation = 1;
-          newGrid[5][6] = new Tile('wire', 'straight'); newGrid[5][6].rotation = 1;
-          newGrid[5][7] = new Tile('motor', ''); newGrid[5][7].rotation = 1;
-          newGrid[5][8] = new Tile('wire', 'turn'); newGrid[5][8].rotation = 3;
-        } else if (level.startsWith('w-')) {
-          // Placeholder for the rest of wiring levels
-          const mcb1 = new Tile('breaker', 'mcb'); mcb1.rotation = 0; mcb1.isLocked = true;
-          const mcb2 = new Tile('breaker', 'mcb'); mcb2.rotation = 0; mcb2.isLocked = true;
-          newGrid[5][9] = mcb1; newGrid[5][10] = mcb2;
-        } else if (level === 'class_c_u1_7' && classCU17 && classCU17.grid) {
-          for (let y = 0; y < Math.min(size, classCU17.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU17.grid[y].length); x++) {
-              if (classCU17.grid[y] && classCU17.grid[y][x]) {
-                newGrid[y][x] = Object.assign(new Tile(), classCU17.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u1_1' && classCU11 && classCU11.grid) {
-          for (let y = 0; y < Math.min(size, classCU11.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU11.grid[y].length); x++) {
-              if (classCU11.grid[y] && classCU11.grid[y][x]) {
-                newGrid[y][x] = Object.assign(new Tile(), classCU11.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u1_2' && classCU12 && classCU12.grid) {
-          for (let y = 0; y < Math.min(size, classCU12.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU12.grid[y].length); x++) {
-              if (classCU12.grid[y] && classCU12.grid[y][x]) {
-                newGrid[y][x] = Object.assign(new Tile(), classCU12.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u1_3' && classCU13 && classCU13.grid) {
-          for (let y = 0; y < Math.min(size, classCU13.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU13.grid[y].length); x++) {
-              if (classCU13.grid[y] && classCU13.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU13.grid[y][x]);
-              }
-            }
-          }
-                } else if (level === 'class_c_u1_4' && classCU14 && classCU14.grid) {
-          for (let y = 0; y < Math.min(size, classCU14.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU14.grid[y].length); x++) {
-              if (classCU14.grid[y] && classCU14.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU14.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u1_5' && classCU15 && classCU15.grid) {
-          for (let y = 0; y < Math.min(size, classCU15.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU15.grid[y].length); x++) {
-              if (classCU15.grid[y] && classCU15.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU15.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u1_6' && classCU16 && classCU16.grid) {
-          for (let y = 0; y < Math.min(size, classCU16.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU16.grid[y].length); x++) {
-              if (classCU16.grid[y] && classCU16.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU16.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_1' && classCU21 && classCU21.grid) {
-          for (let y = 0; y < Math.min(size, classCU21.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU21.grid[y].length); x++) {
-              if (classCU21.grid[y] && classCU21.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU21.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_2' && classCU22 && classCU22.grid) {
-          for (let y = 0; y < Math.min(size, classCU22.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU22.grid[y].length); x++) {
-              if (classCU22.grid[y] && classCU22.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU22.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_4' && classCU24 && classCU24.grid) {
-          for (let y = 0; y < Math.min(size, classCU24.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU24.grid[y].length); x++) {
-              if (classCU24.grid[y] && classCU24.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU24.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_5' && classCU25 && classCU25.grid) {
-          for (let y = 0; y < Math.min(size, classCU25.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU25.grid[y].length); x++) {
-              if (classCU25.grid[y] && classCU25.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU25.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_6' && classCU26 && classCU26.grid) {
-          for (let y = 0; y < Math.min(size, classCU26.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU26.grid[y].length); x++) {
-              if (classCU26.grid[y] && classCU26.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU26.grid[y][x]);
-              }
-            }
-          }
-        } else if (level === 'class_c_u2_7' && classCU27 && classCU27.grid) {
-          for (let y = 0; y < Math.min(size, classCU27.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU27.grid[y].length); x++) {
-              if (classCU27.grid[y] && classCU27.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU27.grid[y][x]);
-              }
-            }
-          }
-} else if (level === 'class_c_u2_3' && classCU23 && classCU23.grid) {
-          for (let y = 0; y < Math.min(size, classCU23.grid.length); y++) {
-            for (let x = 0; x < Math.min(size, classCU23.grid[y].length); x++) {
-              if (classCU23.grid[y] && classCU23.grid[y][x]) { 
-                newGrid[y][x] = Object.assign(new Tile(), classCU23.grid[y][x]);
-              }
-            }
-          }
-        }
+        LevelRegistry.applyLevelToGrid(level, newGrid, size);
       }
 
       setGrid(newGrid);
@@ -974,6 +214,9 @@ export default function App() {
     let newGridSize = 60;
     if (mode === 'tutorial') {
       defaultLevel = '0-1';
+      newGridSize = 10;
+    } else if (mode === 'electronic') {
+      defaultLevel = 'jh-menu';
       newGridSize = 10;
     }
     
@@ -1003,32 +246,7 @@ export default function App() {
       }
 
       if (currentMode === 'plc') {
-        const splitCol = newSize <= 10 ? 5 : 10;
-        const lastLadderCol = splitCol - 1;
-
-        const tileH = new Tile('wire', 'h');
-        tileH.rotation = 0;
-        tileH.isLocked = true;
-        next[0][0] = tileH;
-
-        for (let y = 1; y < newSize; y++) {
-          const tileT = new Tile('wire', 't');
-          tileT.rotation = 3;
-          tileT.isLocked = true;
-          next[y][0] = tileT;
-        }
-
-        const tileG = new Tile('wire', 'g');
-        tileG.rotation = 0;
-        tileG.isLocked = true;
-        next[0][lastLadderCol] = tileG;
-
-        for (let y = 1; y < newSize; y++) {
-          const tileT = new Tile('wire', 't');
-          tileT.rotation = 1;
-          tileT.isLocked = true;
-          next[y][lastLadderCol] = tileT;
-        }
+        LevelRegistry.setupPlcResizeRails(next, newSize);
       }
 
       return next;
@@ -1048,25 +266,23 @@ export default function App() {
   // Load Logic Level
   const handleLoadLogicLevel = (levelId: LogicLevelId) => {
     setLogicLevel(levelId);
-    if (!isLeftPinned && levelId !== 'tutorial-menu' && levelId !== 'wiring-menu') {
+    if (!isLeftPinned && levelId !== 'tutorial-menu' && levelId !== 'wiring-menu' && levelId !== 'wiring-puzzle-menu' && levelId !== 'logic-puzzle-menu' && levelId !== 'jh-menu' && levelId !== 'sh-menu') {
       setIsLeftSidebarOpen(false);
     }
-    if (levelId === 'tutorial-menu' || levelId === 'wiring-menu') {
+    if (levelId === 'tutorial-menu' || levelId === 'wiring-menu' || levelId === 'wiring-puzzle-menu' || levelId === 'logic-puzzle-menu' || levelId === 'jh-menu' || levelId === 'sh-menu') {
       return; // Do nothing else, just show the menu
     }
     if (levelId === 'sandbox') {
       handleChangeGridSize(60);
       handleClearCanvas(true, undefined, levelId, 60);
     } else {
-      let sz = 10;
-      if (levelId.startsWith('2-') || levelId.startsWith('3-') || levelId.startsWith('4-')) sz = 15;
-      if (levelId.startsWith('5-')) sz = 20;
-      if (levelId.startsWith('w-')) sz = 15;
-      if (levelId === 'w-1-1' || levelId === 'w-1-2' || levelId === 'w-1-3' || levelId === 'w-1-4' || levelId === 'w-2-1' || levelId === 'w-2-2' || levelId === 'w-2-3' || levelId === 'w-2-4' || levelId === 'w-3-1' || levelId === 'w-3-2' || levelId === 'w-3-3' || levelId === 'w-4-1' || levelId === 'w-4-2') sz = 10;
-      if (levelId === 'class_c_u1_7' || levelId === 'class_c_u1_1' || levelId === 'class_c_u1_2' || levelId.startsWith('class_c_')) sz = 60;
+      const sz = LevelRegistry.getDefaultGridSize(levelId);
       if (currentMode === 'plc' && plcSubTab === 'ladder') setLadderGridSize(sz);
       else setWiringGridSize(sz);
       handleClearCanvas(false, undefined, levelId, sz);
+      if (levelId === 'sh-4-2' || levelId === 'sh-4-3' || levelId === 'sh-3-2' || levelId === 'sh-3-3' || levelId === 'sh-5-2' || levelId === 'sh-5-3') {
+        setIsRightSidebarOpen(true);
+      }
     }
   };
 
@@ -1188,50 +404,174 @@ export default function App() {
   };
 
   // Selection Actions
-  const handleCutSelection = () => {
-    // Perform copy then delete
-    handleCopySelection(false);
-    handleDeleteSelection(true);
-    handleSetTool('paste');
+  const handleCopySelection = useCallback((changeTool: boolean = true) => {
+    if (!selectionBounds) {
+      showAlert('請先框選要複製的區域');
+      return;
+    }
+    const isLadder = currentMode === 'plc' && plcSubTab === 'ladder';
+    const activeTargetGrid = isLadder ? ladderGrid : grid;
+    const cb = SelectionEngine.copySelection(selectionBounds, activeTargetGrid);
+    const hasAnyTile = cb.data.some((row) => row.some((t) => t !== null));
+    if (!hasAnyTile) {
+      showAlert('選取範圍內沒有可複製的元件');
+      return;
+    }
+    setClipboard(cb);
+    showAlert('📋 已複製選取區！點擊畫布即可貼上 (Ctrl+V)');
+    if (changeTool) setCurrentTool('paste');
     if (!isRightPinned) {
       setIsRightSidebarOpen(false);
     }
-  };
+  }, [selectionBounds, currentMode, plcSubTab, ladderGrid, grid, showAlert, isRightPinned]);
 
-  const handleCopySelection = (changeTool: boolean = true) => {
-    if (!selectionBounds) return;
-    const { minX, maxX, minY, maxY } = selectionBounds;
-
-    const cbData: (Tile | null)[][] = [];
-    for (let y = minY; y <= maxY; y++) {
-      const row: (Tile | null)[] = [];
-      for (let x = minX; x <= maxX; x++) {
-        const t = grid[y]?.[x];
-        row.push(t && !t.isLocked ? JSON.parse(JSON.stringify(t)) : null);
-      }
-      cbData.push(row);
+  const handleDeleteSelection = useCallback((keepSelection: boolean = false) => {
+    if (!selectionBounds) {
+      showAlert('請先框選要刪除的區域');
+      return;
     }
-    setClipboard({ w: maxX - minX + 1, h: maxY - minY + 1, data: cbData });
-    if (changeTool) handleSetTool('paste');
-    if (!isRightPinned) {
-      setIsRightSidebarOpen(false);
-    }
-  };
-
-  const handleDeleteSelection = (keepSelection: boolean = false) => {
-    if (!selectionBounds) return;
-    const { minX, maxX, minY, maxY } = selectionBounds;
     saveState();
-    setGrid((prev) =>
-      prev.map((row, y) =>
-        row.map((t, x) => (y >= minY && y <= maxY && x >= minX && x <= maxX && t && !t.isLocked ? null : t))
-      )
-    );
-    if (!keepSelection) setSelectionBounds(null);
+    const isLadder = currentMode === 'plc' && plcSubTab === 'ladder';
+    const activeSetter = isLadder ? setLadderGrid : setGrid;
+    activeSetter((prev) => SelectionEngine.deleteSelection(selectionBounds, prev));
+    if (!keepSelection) {
+      setSelectionBounds(null);
+    }
+    showAlert('🗑️ 已刪除選取區中的元件');
     if (!isRightPinned) {
       setIsRightSidebarOpen(false);
     }
-  };
+  }, [selectionBounds, currentMode, plcSubTab, saveState, setLadderGrid, setGrid, showAlert, isRightPinned]);
+
+  const handleCutSelection = useCallback(() => {
+    if (!selectionBounds) {
+      showAlert('請先框選要剪下的區域');
+      return;
+    }
+    const isLadder = currentMode === 'plc' && plcSubTab === 'ladder';
+    const activeTargetGrid = isLadder ? ladderGrid : grid;
+    const cb = SelectionEngine.copySelection(selectionBounds, activeTargetGrid);
+    const hasAnyTile = cb.data.some((row) => row.some((t) => t !== null));
+    if (!hasAnyTile) {
+      showAlert('選取範圍內沒有可剪下的元件');
+      return;
+    }
+    setClipboard(cb);
+    saveState();
+    const activeSetter = isLadder ? setLadderGrid : setGrid;
+    activeSetter((prev) => SelectionEngine.deleteSelection(selectionBounds, prev));
+    setSelectionBounds(null);
+    setCurrentTool('paste');
+    showAlert('✂️ 已剪下選取區！點擊畫布即可貼上 (Ctrl+V)');
+    if (!isRightPinned) {
+      setIsRightSidebarOpen(false);
+    }
+  }, [selectionBounds, currentMode, plcSubTab, ladderGrid, grid, saveState, setLadderGrid, setGrid, showAlert, isRightPinned]);
+
+  const handleSelectAll = useCallback(() => {
+    const isLadder = currentMode === 'plc' && plcSubTab === 'ladder';
+    const activeTargetGrid = isLadder ? ladderGrid : grid;
+
+    let minX = activeGridSize, maxX = -1, minY = activeGridSize, maxY = -1;
+    for (let y = 0; y < activeGridSize; y++) {
+      for (let x = 0; x < activeGridSize; x++) {
+        if (activeTargetGrid[y]?.[x]) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX === -1) {
+      showAlert('目前畫布上沒有任何元件可供選取');
+      return;
+    }
+
+    setSelectionBounds({ minX, maxX, minY, maxY });
+    setCurrentTool('select');
+    showAlert(`全選完成（共涵蓋 ${maxX - minX + 1} x ${maxY - minY + 1} 範圍）`);
+  }, [currentMode, plcSubTab, ladderGrid, grid, activeGridSize, showAlert]);
+
+  // Global Keyboard Shortcuts for Selection, Clipboard, and Deletion
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      // Ctrl+C / Cmd+C (Copy)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        if (selectionBounds) {
+          e.preventDefault();
+          handleCopySelection(true);
+        }
+        return;
+      }
+
+      // Ctrl+X / Cmd+X (Cut)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) {
+        if (selectionBounds) {
+          e.preventDefault();
+          handleCutSelection();
+        }
+        return;
+      }
+
+      // Ctrl+V / Cmd+V (Paste)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        if (clipboard) {
+          e.preventDefault();
+          setCurrentTool('paste');
+          showAlert('📋 貼上模式：請在畫布目標位置點擊以置入元件');
+        } else {
+          showAlert('剪貼簿目前為空，請先複製或剪下元件');
+        }
+        return;
+      }
+
+      // Ctrl+A / Cmd+A (Select All)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
+
+      // Delete / Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectionBounds) {
+          e.preventDefault();
+          handleDeleteSelection(false);
+        }
+        return;
+      }
+
+      // Escape
+      if (e.key === 'Escape') {
+        if (selectionBounds) {
+          setSelectionBounds(null);
+        }
+        if (currentTool === 'paste' || currentTool === 'select') {
+          setCurrentTool('interact');
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectionBounds,
+    clipboard,
+    currentTool,
+    handleCopySelection,
+    handleCutSelection,
+    handleDeleteSelection,
+    handleSelectAll,
+    showAlert,
+  ]);
 
   // JSON Export / Import
   const handleExportJSON = () => {
@@ -1493,7 +833,11 @@ export default function App() {
           onOpenModal={handleOpenModal}
           onUpdateMeterValues={setMeterValues}
           onSaveState={saveState}
+          selectionBounds={selectionBounds}
           onSelectionChange={setSelectionBounds}
+          onCutSelection={handleCutSelection}
+          onCopySelection={handleCopySelection}
+          onDeleteSelection={handleDeleteSelection}
           onUndo={handleUndo}
           onSetTool={handleSetTool}
           onLoadLogicLevel={handleLoadLogicLevel}
@@ -1520,6 +864,7 @@ export default function App() {
               currentTool={currentTool}
               meterChannel={meterChannel}
               oscVal={meterValues.oscVal}
+              channelOscVals={meterValues.channelOscVals}
               vVal={meterValues.vVal}
               aVal={meterValues.aVal}
               wVal={meterValues.wVal}
@@ -1547,6 +892,8 @@ export default function App() {
               onDeleteSelection={handleDeleteSelection}
               onToggleFaultMode={handleToggleFaultMode}
               onClearFaults={handleClearFaults}
+              logicLevel={logicLevel}
+              onShowAlert={showAlert}
             />
           )}
         </div>
